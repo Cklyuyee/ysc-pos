@@ -1,0 +1,146 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+  --background: #ffffff;
+  --foreground: oklch(0.145 0 0);
+  --card: #ffffff;
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #2563EB;
+  --primary-foreground: #ffffff;
+  --secondary: oklch(0.95 0.0058 264.53);
+  --secondary-foreground: #030213;
+  --muted: #ececf0;
+  --muted-foreground: #717182;
+  --accent: #e9ebef;
+  --accent-foreground: #030213;
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+  --border: rgba(0, 0, 0, 0.1);
+  --input: #e2e8f0;
+  --input-background: #ffffff;
+  --switch-background: #cbced4;
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --ring: #2563EB;
+  --radius: 0.625rem;
+}
+
+@theme inline {
+  --font-sans: "Google Sans", system-ui, sans-serif;
+  --font-heading: "Google Sans", system-ui, sans-serif;
+
+  /* Brand Design System Colors */
+  --color-brand-primary: #2563EB;
+  --color-brand-primary-dark: #1D4ED8;
+  --color-brand-primary-light: #EFF6FF;
+  --color-brand-accent: #FBBF24;
+  --color-brand-secondary: #FBBF24;
+
+  --color-brand-navy: #1e3a8a;
+  --color-brand-navy-light: #1e40af;
+  --color-brand-navy-dark: #172554;
+
+  --color-bg-page: #F8F9FB;
+  --color-bg-card: #FFFFFF;
+  --color-bg-hover: #EFF6FF;
+
+  --color-border-default: #E5E7EB;
+  --color-border-focus: #2563EB;
+
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+  --color-text-link: #2563EB;
+  --color-text-on-dark: #FFFFFF;
+
+  --color-status-success: #10B981;
+  --color-status-success-bg: #ECFDF5;
+  --color-status-warning: #FBBF24;
+  --color-status-warning-bg: #FEF3C7;
+  --color-status-danger: #EF4444;
+  --color-status-danger-bg: #FEF2F2;
+  --color-status-info: #2563EB;
+  --color-status-info-bg: #EFF6FF;
+
+  --color-tier-prospect-bg: #f1f5f9;
+  --color-tier-prospect-text: #64748b;
+  --color-tier-member-bg: #3b82f6;
+  --color-tier-member-text: #ffffff;
+  --color-tier-silver-bg: #cbd5e1;
+  --color-tier-silver-text: #1e293b;
+  --color-tier-gold-bg: #fbbf24;
+  --color-tier-gold-text: #451a03;
+  --color-tier-platinum-bg: #334155;
+  --color-tier-platinum-text: #ffffff;
+  --color-tier-diamond-bg: #1e40af;
+  --color-tier-diamond-text: #ffffff;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-ring: var(--ring);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Google Sans", sans-serif;
+  }
+
+  html {
+    font-size: var(--font-size);
+  }
+
+  /* Global Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+}
