@@ -21,6 +21,7 @@ import { PaymentDialog } from './PaymentDialog';
 import { CancelBillDialog } from './CancelBillDialog';
 import { HeldBillsDialog, type HeldBill } from './HeldBillsDialog';
 import { SlipUploadDialog } from './SlipUploadDialog';
+import { ProductPickerDialog } from './ProductPickerDialog';
 import type { Customer } from '../../../data/customers';
 
 const NAVY = '#14264E';
@@ -192,6 +193,8 @@ export default function POSScreen() {
   const [showSlipUpload, setShowSlipUpload] = useState(false);
   const [pendingSlipOrderId, setPendingSlipOrderId] = useState<string | null>(null);
   const [pendingSlipAmount, setPendingSlipAmount] = useState(0);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerInitialQuery, setPickerInitialQuery] = useState('');
   const barcodeRef = useRef<HTMLInputElement>(null);
   const qtyRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -247,6 +250,31 @@ export default function POSScreen() {
   const showError = (msg: string) => {
     setErrorMsg(msg);
     setTimeout(() => setErrorMsg(''), 8000);
+  };
+
+  const handlePickerSelect = async (product: ApiProduct, qty: number) => {
+    const id = await ensureCartId();
+    if (!id) return;
+    setApiLoading(true);
+    try {
+      setProductMap(prev => new Map(prev).set(product.sku, product));
+      const updated = await addItem(id, product.sku, qty);
+      applyCartResponse(updated);
+      setBarcodeInput('');
+      setPendingQty(1);
+    } catch (err: unknown) {
+      console.error('[handlePickerSelect] failed', err);
+      const e = err as { status?: number; message?: string };
+      if (e.status === 409) {
+        const m = (e.message ?? '').match(/for ([^:]+): requested \+(\d+), available (\d+)/);
+        if (m) showError(`สต็อกไม่พอ — สินค้า ${m[1]} ขอ ${m[2]} แต่เหลือ ${m[3]}`);
+        else showError(e.message ?? 'สต็อกสินค้าไม่เพียงพอ');
+      } else {
+        showError(e.message ?? 'เพิ่มสินค้าไม่สำเร็จ');
+      }
+    } finally {
+      setApiLoading(false);
+    }
   };
 
   // Lazy-init cart on demand: needed only when actually adding an item.
@@ -521,6 +549,13 @@ export default function POSScreen() {
         onUploaded={handleSlipUploaded}
       />
 
+      <ProductPickerDialog
+        open={showPicker}
+        initialQuery={pickerInitialQuery}
+        onClose={() => setShowPicker(false)}
+        onSelect={(p, qty) => { void handlePickerSelect(p, qty); }}
+      />
+
       {/* Top bar */}
       <header className="flex items-center justify-between px-6 h-16 text-white shrink-0" style={{ backgroundColor: NAVY }}>
         <div className="flex items-center gap-3">
@@ -564,7 +599,7 @@ export default function POSScreen() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              <FKey hotkey="F1" label="ค้นหาสินค้า"   icon={Search}   onClick={() => { barcodeRef.current?.focus(); barcodeRef.current?.select(); }} />
+              <FKey hotkey="F1" label="ค้นหาสินค้า"   icon={Search}   onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }} />
               <FKey hotkey="F2" label="เปลี่ยนลูกค้า"  icon={RefreshCw} onClick={() => setShowCustomerSearch(true)} />
               <FKey hotkey="F3" label="ยกเลิกรายการ"   icon={XCircle}  onClick={handleClearItems} />
               <FKey hotkey="F4" label="ยกเลิกบิล"      icon={Ban}      onClick={() => cartItems.length > 0 && setShowCancel(true)} />
@@ -608,8 +643,8 @@ export default function POSScreen() {
                 )}
               </div>
               <Button size="lg" className="h-12 px-6 font-bold hover:opacity-90 shrink-0"
-                style={{ backgroundColor: YELLOW, color: NAVY }} onClick={() => { void handleBarcodeSubmit(); }}>
-                <Plus className="w-4 h-4" /> เพิ่มสินค้า
+                style={{ backgroundColor: YELLOW, color: NAVY }} onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }}>
+                <Search className="w-4 h-4" /> ค้นหาเพิ่มเติม
               </Button>
             </div>
             {errorMsg && (
