@@ -249,12 +249,31 @@ export default function POSScreen() {
     setTimeout(() => setErrorMsg(''), 8000);
   };
 
+  // Lazy-init cart on demand: needed only when actually adding an item.
+  // Search-only operations (barcode/SKU lookup) don't depend on cart.
+  const ensureCartId = async (): Promise<string | null> => {
+    if (cartId) return cartId;
+    try {
+      const fresh = await createCart();
+      setCartId(fresh.id);
+      setCartItems(fresh.items ?? []);
+      return fresh.id;
+    } catch (err: unknown) {
+      console.error('[ensureCartId] createCart failed', err);
+      const e = err as { status?: number; message?: string };
+      showError(e.status
+        ? `สร้าง cart ไม่ได้ (HTTP ${e.status}): ${e.message ?? ''}`
+        : `เชื่อมต่อ API ไม่ได้: ${e.message ?? ''}`);
+      return null;
+    }
+  };
+
   const handleBarcodeSubmit = async () => {
     const q = barcodeInput.trim();
-    if (!cartId) { showError('ระบบยังไม่พร้อม กรุณารอสักครู่'); return; }
     if (!q) { showError('กรุณาสแกนบาร์โค้ดหรือพิมพ์ SKU'); barcodeRef.current?.focus(); return; }
     setApiLoading(true);
     try {
+      // 1) Look up product (no cart needed)
       const byBarcode = await getProductByBarcode(q);
       let sku = q;
       if (byBarcode.length > 0) {
@@ -272,7 +291,10 @@ export default function POSScreen() {
           return;
         }
       }
-      const updated = await addItem(cartId, sku, pendingQty);
+      // 2) Now we need a cart to add the item — lazy init if missing
+      const id = await ensureCartId();
+      if (!id) return;
+      const updated = await addItem(id, sku, pendingQty);
       applyCartResponse(updated);
       setBarcodeInput('');
       setPendingQty(1);
