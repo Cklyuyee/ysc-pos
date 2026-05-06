@@ -29,7 +29,7 @@ export default function POSLogin() {
     setError('');
     try {
       await signIn(email.trim(), password);
-      navigate('/pos');
+      navigate('/');
     } catch (err: unknown) {
       const status = (err as { status?: number }).status;
       if (status === 401 || status === 400) {

@@ -13,4 +13,7 @@ export const signIn = (email: string, password: string) =>
     body: JSON.stringify({ email, password }),
   })
 
+export const signOut = () =>
+  apiFetch<void>('/auth/sign-out', { method: 'POST' })
+
 export const getMe = () => apiFetch<MeResponse>('/me')

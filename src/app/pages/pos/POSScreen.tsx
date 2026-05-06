@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router';
 import {
   Search, RefreshCw, XCircle, Ban, Pause, Inbox, Trash2,
   Truck, Store, Gift, Coins, CreditCard, Tag, Sparkles,
-  ChevronRight, Plus, AlertTriangle,
+  ChevronRight, Plus, AlertTriangle, LogOut,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/Badge';
@@ -13,11 +14,13 @@ import {
   type PosCart, type PosCartItem,
 } from '../../../services/cartApi';
 import { searchProducts, getProductByBarcode, type ApiProduct } from '../../../services/productsApi';
+import { getMe, signOut, type MeResponse } from '../../../services/authApi';
 import { CustomerSearchDialog } from './CustomerSearchDialog';
 import { RegisterMemberDialog } from './RegisterMemberDialog';
 import { PaymentDialog } from './PaymentDialog';
 import { CancelBillDialog } from './CancelBillDialog';
 import { HeldBillsDialog, type HeldBill } from './HeldBillsDialog';
+import { SlipUploadDialog } from './SlipUploadDialog';
 import type { Customer } from '../../../data/customers';
 
 const NAVY = '#14264E';
@@ -185,8 +188,21 @@ export default function POSScreen() {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [apiLoading, setApiLoading] = useState(false);
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [showSlipUpload, setShowSlipUpload] = useState(false);
+  const [pendingSlipOrderId, setPendingSlipOrderId] = useState<string | null>(null);
+  const [pendingSlipAmount, setPendingSlipAmount] = useState(0);
   const barcodeRef = useRef<HTMLInputElement>(null);
   const qtyRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    getMe()
+      .then(setMe)
+      .catch((err: unknown) => {
+        if ((err as { status?: number }).status === 401) navigate('/login');
+      });
+  }, [navigate]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 30_000);
@@ -321,8 +337,9 @@ export default function POSScreen() {
     } catch { /* ignore */ }
   };
 
-  // F5 holdBill: stashes a snapshot locally; the active cart keeps living on the server
-  const holdBill = () => {
+  // F5 holdBill: snapshots cart locally + abandons server cart so reserves go back to other registers.
+  // Restore later re-adds items to a fresh cart (re-reserving against current stock).
+  const holdBill = async (): Promise<void> => {
     if (cartItems.length === 0 || !cartId) return;
     const displayItems = cartItems.map(item => {
       const p = productMap.get(item.sku);
@@ -347,45 +364,95 @@ export default function POSScreen() {
       total,
     };
     setHeldBills(prev => [held, ...prev]);
-    // Create new empty cart for next transaction
-    createCart().then(fresh => {
-      applyCartResponse(fresh);
-      setCustomer(null);
-      setBillSeq(n => n + 1);
-    }).catch(() => {});
-  };
-
-  const restoreBill = (bill: HeldBill) => {
-    // Simply switch UI view — the old cart stays on server with its own id
-    // We need to hold current if there are items
-    if (cartItems.length > 0) holdBill();
-    setCustomer(bill.customer);
-    setHeldBills(prev => prev.filter(b => b.id !== bill.id));
-    // Note: bill.items are display-only; actual re-loading would require re-adding items
-    // For now show the held items as-is (read-only display scenario)
-  };
-
-  const deleteHeldBill = (billId: string) => setHeldBills(prev => prev.filter(b => b.id !== billId));
-
-  // Payment confirmation
-  const handlePaymentConfirm = async (method: 'cash' | 'card' | 'credit' | 'qr') => {
-    if (!cartId) return;
-    const apiMethod = {
-      cash: 'cash',
-      card: 'credit-card',
-      credit: 'credit-limit',
-      qr: 'qr-code',
-    }[method] as 'cash' | 'bank-transfer' | 'qr-code' | 'credit-card' | 'credit-limit';
-
+    try { await abandonCart(cartId); } catch { /* ignore */ }
     try {
-      await checkout(cartId, apiMethod, customer?.id);
       const fresh = await createCart();
       applyCartResponse(fresh);
       setCustomer(null);
       setBillSeq(n => n + 1);
+    } catch {
+      showError('สร้างบิลใหม่ไม่สำเร็จ — กรุณาลองใหม่');
+    }
+  };
+
+  const restoreBill = async (bill: HeldBill) => {
+    setApiLoading(true);
+    try {
+      if (cartItems.length > 0) await holdBill();
+      const fresh = await createCart(bill.customer?.id);
+      const skus = bill.items.map(i => i.product.sku);
+      const fetched = await Promise.all(skus.map(sku => searchProducts(sku).catch(() => [])));
+      setProductMap(prev => {
+        const next = new Map(prev);
+        fetched.flat().forEach(p => { if (p) next.set(p.sku, p); });
+        return next;
+      });
+      let latest: PosCart = fresh;
+      for (const item of bill.items) {
+        try {
+          latest = await addItem(fresh.id, item.product.sku, item.qty);
+        } catch (err: unknown) {
+          const status = (err as { status?: number }).status;
+          showError(status === 409
+            ? `สต็อก ${item.product.sku} ไม่พอ — เหลือไม่ครบ ${item.qty}`
+            : `เพิ่ม ${item.product.sku} ไม่สำเร็จ`);
+        }
+      }
+      applyCartResponse(latest);
+      setCustomer(bill.customer);
+      setHeldBills(prev => prev.filter(b => b.id !== bill.id));
+    } finally {
+      setApiLoading(false);
+    }
+  };
+
+  const deleteHeldBill = (billId: string) => setHeldBills(prev => prev.filter(b => b.id !== billId));
+
+  const PAYMENT_METHOD_MAP: Record<'cash' | 'card' | 'credit' | 'qr', 'cash' | 'credit-card' | 'credit-limit' | 'qr-code'> = {
+    cash: 'cash',
+    card: 'credit-card',
+    credit: 'credit-limit',
+    qr: 'qr-code',
+  };
+
+  const handlePaymentConfirm = async (method: 'cash' | 'card' | 'credit' | 'qr') => {
+    if (!cartId) return;
+    const apiMethod = PAYMENT_METHOD_MAP[method];
+    const grand = totals.grand;
+
+    try {
+      const result = await checkout(cartId, apiMethod, customer?.id);
+      const orderId = result?.order?.id ?? null;
+
+      if (apiMethod === 'qr-code') {
+        setPendingSlipOrderId(orderId);
+        setPendingSlipAmount(grand);
+        setShowSlipUpload(true);
+      } else {
+        const fresh = await createCart();
+        applyCartResponse(fresh);
+        setCustomer(null);
+        setBillSeq(n => n + 1);
+      }
     } catch (err: unknown) {
       showError((err as Error).message ?? 'การชำระเงินล้มเหลว');
     }
+  };
+
+  const handleSlipUploaded = async () => {
+    setShowSlipUpload(false);
+    setPendingSlipOrderId(null);
+    try {
+      const fresh = await createCart();
+      applyCartResponse(fresh);
+      setCustomer(null);
+      setBillSeq(n => n + 1);
+    } catch { /* ignore — staff can retry create cart */ }
+  };
+
+  const handleSignOut = async () => {
+    try { await signOut(); } catch { /* ignore — still navigate to login */ }
+    navigate('/login');
   };
 
   // Totals
@@ -416,6 +483,14 @@ export default function POSScreen() {
       <HeldBillsDialog open={showHeld} bills={heldBills} onClose={() => setShowHeld(false)}
         onRestore={restoreBill} onDelete={deleteHeldBill} />
 
+      <SlipUploadDialog
+        open={showSlipUpload}
+        orderId={pendingSlipOrderId}
+        totalAmount={pendingSlipAmount}
+        onClose={handleSlipUploaded}
+        onUploaded={handleSlipUploaded}
+      />
+
       {/* Top bar */}
       <header className="flex items-center justify-between px-6 h-16 text-white shrink-0" style={{ backgroundColor: NAVY }}>
         <div className="flex items-center gap-3">
@@ -425,9 +500,25 @@ export default function POSScreen() {
             <div className="text-[11px] text-white/60">ระบบหน้าขาย YSC • 10,000+ สินค้า</div>
           </div>
         </div>
-        <div className="text-right leading-tight">
-          <div className="text-lg font-bold tabular-nums">{time}</div>
-          <div className="text-[11px] text-white/60">{dateLabel}</div>
+        <div className="flex items-center gap-4">
+          <div className="text-right leading-tight">
+            <div className="text-lg font-bold tabular-nums">{time}</div>
+            <div className="text-[11px] text-white/60">{dateLabel}</div>
+          </div>
+          {me && (
+            <div className="text-right leading-tight border-l border-white/15 pl-4">
+              <div className="text-sm font-semibold">{me.name}</div>
+              <div className="text-[11px] text-white/60">{me.role}</div>
+            </div>
+          )}
+          <button
+            onClick={handleSignOut}
+            title="ออกจากระบบ"
+            className="flex items-center gap-1.5 px-3 h-9 rounded-lg bg-white/10 hover:bg-white/20 transition text-sm font-semibold"
+          >
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">ออกจากระบบ</span>
+          </button>
         </div>
       </header>
 
@@ -450,7 +541,7 @@ export default function POSScreen() {
               <FKey hotkey="F2" label="เปลี่ยนลูกค้า"  icon={RefreshCw} onClick={() => setShowCustomerSearch(true)} />
               <FKey hotkey="F3" label="ยกเลิกรายการ"   icon={XCircle}  onClick={handleClearItems} />
               <FKey hotkey="F4" label="ยกเลิกบิล"      icon={Ban}      onClick={() => cartItems.length > 0 && setShowCancel(true)} />
-              <FKey hotkey="F5" label="พักบิล"          icon={Pause}    onClick={holdBill} />
+              <FKey hotkey="F5" label="พักบิล"          icon={Pause}    onClick={() => { void holdBill(); }} />
               <FKey label="ดึงบิล" icon={Inbox} count={heldBills.length} onClick={() => setShowHeld(true)} />
             </div>
           </div>
