@@ -196,8 +196,12 @@ export default function POSScreen() {
   const [pendingSlipAmount, setPendingSlipAmount] = useState(0);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerInitialQuery, setPickerInitialQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<ApiProduct[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
   const qtyRef = useRef<HTMLInputElement>(null);
+  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -212,6 +216,34 @@ export default function POSScreen() {
     const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  // Live typeahead suggestions for the barcode/SKU bar (2+ chars, 250ms debounce)
+  useEffect(() => {
+    const q = barcodeInput.trim();
+    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    if (q.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setSuggestLoading(false);
+      return;
+    }
+    setSuggestLoading(true);
+    suggestDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await searchProducts(q);
+        setSuggestions(res.slice(0, 8));
+        setShowSuggestions(true);
+      } catch (err: unknown) {
+        console.error('[suggestions] failed', err);
+        setSuggestions([]);
+      } finally {
+        setSuggestLoading(false);
+      }
+    }, 250);
+    return () => {
+      if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    };
+  }, [barcodeInput]);
 
   useEffect(() => {
     (async () => {
@@ -251,6 +283,15 @@ export default function POSScreen() {
   const showError = (msg: string) => {
     setErrorMsg(msg);
     setTimeout(() => setErrorMsg(''), 8000);
+  };
+
+  const handleSuggestionPick = async (product: ApiProduct) => {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setBarcodeInput('');
+    await handlePickerSelect(product, pendingQty);
+    setPendingQty(1);
+    barcodeRef.current?.focus();
   };
 
   const handlePickerSelect = async (product: ApiProduct, qty: number) => {
@@ -312,11 +353,8 @@ export default function POSScreen() {
         exact = bySearch.find(p => p.sku === q || p.barcode === q);
       }
       if (!exact) {
-        // No exact match — open the picker dialog seeded with the query so the
-        // cashier can pick from search results instead of seeing a dead end.
-        setApiLoading(false);
-        setPickerInitialQuery(q);
-        setShowPicker(true);
+        // No exact match — keep typeahead suggestions open so cashier can pick.
+        setShowSuggestions(true);
         return;
       }
       setProductMap(prev => new Map(prev).set(exact!.sku, exact!));
@@ -648,17 +686,61 @@ export default function POSScreen() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 <input ref={barcodeRef} value={barcodeInput}
                   onChange={e => setBarcodeInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleBarcodeSubmit(); }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { setShowSuggestions(false); handleBarcodeSubmit(); }
+                    else if (e.key === 'Escape') setShowSuggestions(false);
+                  }}
+                  onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                   autoFocus
-                  placeholder="สแกนบาร์โค้ด หรือพิมพ์ SKU แล้วกด Enter"
+                  placeholder="สแกนบาร์โค้ด หรือพิมพ์ชื่อสินค้า / SKU (ขั้นต่ำ 2 ตัวอักษร)"
                   className="w-full h-12 pl-10 pr-4 border-2 border-neutral-200 rounded-xl text-sm bg-white focus:outline-none focus:border-amber-400 transition" />
-                {apiLoading && (
+                {(apiLoading || suggestLoading) && (
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                 )}
-                {pendingQty !== 1 && !apiLoading && (
+                {pendingQty !== 1 && !apiLoading && !suggestLoading && (
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-lg text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-200">
                     ×{pendingQty}
                   </span>
+                )}
+
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white border border-neutral-200 rounded-xl shadow-xl max-h-[360px] overflow-y-auto">
+                    {suggestions.map(p => {
+                      const stock = Math.max(0, p.stockOffline - p.reservedOffline);
+                      const out = stock <= 0;
+                      return (
+                        <button
+                          key={p.sku}
+                          type="button"
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { void handleSuggestionPick(p); }}
+                          disabled={out}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition border-b border-neutral-100 last:border-b-0 ${out ? 'opacity-60 cursor-not-allowed' : 'hover:bg-amber-50/60'}`}
+                        >
+                          <div className="w-9 h-9 rounded bg-neutral-100 flex items-center justify-center shrink-0 overflow-hidden">
+                            {p.image
+                              ? <img src={p.image} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              : <Search className="w-4 h-4 text-neutral-400" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-semibold text-neutral-900 truncate">{p.name}</div>
+                            <div className="text-[11px] text-neutral-500 truncate">
+                              <span className="font-mono">{p.sku}</span>
+                              {p.barcode && <> • <span className="font-mono">{p.barcode}</span></>}
+                              {p.brand && <> • {p.brand}</>}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-sm font-bold text-neutral-900 tabular-nums">{fmt(p.standardPrice)}</div>
+                            <div className={`text-[11px] tabular-nums ${out ? 'text-rose-500 font-bold' : 'text-emerald-600 font-semibold'}`}>
+                              สต็อก {stock} {p.unit}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
               <Button size="lg" className="h-12 px-6 font-bold hover:opacity-90 shrink-0"
