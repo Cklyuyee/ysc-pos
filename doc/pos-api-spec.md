@@ -57,8 +57,9 @@
 
 ### Key design points
 
-- **Reserve happens at scan, not at checkout.** Each `POST /pos/cart/:id/items` increments `ProductSku.reservedOffline` by qty. Checkout does NOT re-reserve — POS-channel orders skip `reserveOrderItems`.
-- **Stock cut happens at ConX payment confirmation, not at checkout.** Until ConX confirms, stock counter is unchanged; only `reservedOffline` is up. Available = `stockOffline - reservedOffline`.
+- **Reserve happens at scan, not at checkout.** Each `POST /pos/cart/:id/items` reserves against the SKU's offline-warehouse slot(s) — slot 1 first, spill to slot 2 if needed. Checkout does NOT re-reserve — POS-channel orders skip `reserveOrderItems`.
+- **Stock cut happens at ConX payment confirmation, not at checkout.** Until ConX confirms, the slot's `locationStock` is unchanged; only `locationReserved` (or `locationReservedOnline`) is up. Offline available = sum across all offline slots of `locationStock − locationReserved`.
+- **Per-location stock model.** A SKU has up to two location slots. The first digit of the location id decodes the warehouse: `1`/`2` = offline (storefront), `3`/`4`/`5` = online (fulfilment), `T` = transit (excluded from sellable stock). See `src/warehouse/lib/location.ts`.
 - **POS skips pick/pack.** The staff hands goods over at the counter. There's no PickTask, no PackAssignment, no Runner. `deliveryStatus` starts at `'none'` and goes straight to `'delivered'` when ConX confirms.
 - **Cart TTL = 15 min.** Every scan / qty change / remove bumps `expiresAt`. A cron sweep (every 5 min) marks idle carts as `abandoned` and releases their reserves so other registers can sell the SKU.
 
@@ -166,7 +167,7 @@ POS UI will need these from the rest of the API. Treat the responses as opaque a
 | Endpoint | Use case |
 |---|---|
 | `POST /auth/sign-in/email` (better-auth) | login |
-| `GET /me` | current user + role |
+| `GET /me/permissions` | current user (id/email/name/role) + effective permission keys — cache on login, use to gate UI |
 | `GET /products?search=&barcode=` | barcode lookup → resolves to `sku` for `/pos/cart/:id/items` |
 | `GET /products/by-code/:code` | direct SKU lookup |
 | `GET /customers?search=` | member lookup (phone / custCode / name) |
@@ -182,7 +183,7 @@ POS UI will need these from the rest of the API. Treat the responses as opaque a
 
 1. **One active cart per staff.** `POST /pos/cart` is idempotent — calling it when an active cart exists returns the same row. UI should treat "open new sale" as "GET active first; if null, POST."
 2. **TTL extends on every mutation.** A staff scrolling on the cart screen does NOT extend it; only add/set/remove/checkout/abandon do. If the UI needs to keep a cart alive during a long pause (e.g. bagging), call `PATCH` with the current qty as a no-op heartbeat.
-3. **Stock check race.** `POST /items` and `PATCH` both check available = `stockOffline - reservedOffline` inside a transaction, but two concurrent registers can both see "1 available" before either reserves. Backend uses a transaction so the second call will return `409` after the first commits. UI should retry-with-error-toast, not silent-fail.
+3. **Stock check race.** `POST /items` and `PATCH` both check offline available (sum of `locationStock − locationReserved` across offline slots) inside a transaction, but two concurrent registers can both see "1 available" before either reserves. Backend uses a transaction so the second call will return `409` after the first commits. UI should retry-with-error-toast, not silent-fail.
 4. **Free items.** `OrderItem.isFreeItem = true` rows are NOT reserved and NOT cut at ConX confirm. POS cart doesn't currently expose free items — promotions that add free items happen during `orders.create` / pricing, not at scan time. If the POS UI needs to show free items pre-checkout, that's a v2 design.
 5. **Pricing.** `addItem` records `unitPrice = ProductSku.standardPrice` at scan time. There's no member-tier or promo logic at the cart level today. If POS needs tier pricing or scan-time promo, raise it — current minimum scope assumes the POS UI shows `standardPrice` and any post-scan adjustment happens via `couponDiscount` on the checkout payload (not yet wired through POS endpoints — would need a v2 enhancement).
 6. **No discount/override at line level (v1).** All adjustments (bill-level discount, coupon) belong to the order, not the cart. POS UI in v1 can pass `paymentMethod` only.
@@ -230,8 +231,9 @@ Things deliberately NOT in v1 — flag if POS team needs any of these now:
 
 ## 8. Pending ops actions before v1 ship
 
-1. Apply migration `20260506000000_pos_cart` on DO via `prisma migrate deploy`.
-2. Re-run `seed-rbac.ts` so `pos_staff` role and `pos.scan` permission land in DB.
-3. Add POS app origin to `CORS_ORIGIN` env, restart API.
-4. Promote a test staff user to role `pos_staff`.
-5. (Optional) Set `CONX_AUTO_CONFIRM=false` if you want to manually drive the confirm step during integration testing.
+1. Apply migrations `20260506000000_pos_cart` + `20260506010000_per_location_stock` on DO via `prisma migrate deploy`.
+2. Re-run `seed.ts` so SKUs get the new per-slot stock fields populated (or wait for ConX sync to do it once integration is live).
+3. Re-run `seed-rbac.ts` so `pos_staff` role and `pos.scan` permission land in DB.
+4. Add POS app origin to `CORS_ORIGIN` env, restart API.
+5. Promote a test staff user to role `pos_staff`.
+6. (Optional) Set `CONX_AUTO_CONFIRM=false` if you want to manually drive the confirm step during integration testing.

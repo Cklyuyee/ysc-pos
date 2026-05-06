@@ -5,6 +5,7 @@ export interface MeResponse {
   name: string
   email: string
   role: string
+  permissions: string[]
 }
 
 export const signIn = (email: string, password: string) =>
@@ -16,4 +17,4 @@ export const signIn = (email: string, password: string) =>
 export const signOut = () =>
   apiFetch<void>('/auth/sign-out', { method: 'POST' })
 
-export const getMe = () => apiFetch<MeResponse>('/me')
+export const getMe = () => apiFetch<MeResponse>('/me/permissions')
