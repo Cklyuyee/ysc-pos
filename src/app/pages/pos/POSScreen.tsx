@@ -302,7 +302,16 @@ export default function POSScreen() {
     } catch (err: unknown) {
       console.error('[handleBarcodeSubmit] failed', err);
       const e = err as { status?: number; message?: string };
-      if (e.status === 409) showError('สต็อกสินค้าไม่เพียงพอ');
+      if (e.status === 409) {
+        // Backend message format: "Insufficient offline stock for SKU-X: requested +N, available M"
+        const m = (e.message ?? '').match(/for ([^:]+): requested \+(\d+), available (\d+)/);
+        if (m) {
+          const [, sku, requested, available] = m;
+          showError(`สต็อกไม่พอ — สินค้า ${sku} ขอ ${requested} แต่เหลือ ${available}`);
+        } else {
+          showError(e.message ?? 'สต็อกสินค้าไม่เพียงพอ');
+        }
+      }
       else if (e.status === 403) showError('ไม่มีสิทธิ์เข้าถึงข้อมูลสินค้า (403)');
       else if (e.status === 404) showError('ไม่พบสินค้า');
       else if (e.status) showError(`API error ${e.status}: ${e.message ?? ''}`);
