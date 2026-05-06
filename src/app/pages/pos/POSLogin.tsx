@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, FlaskConical } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { signIn } from '../../../services/authApi';
-
-const DEV_USERS = [
-  { label: 'POS Staff', email: 'pos@ysc.co.th', password: 'pos1234' },
-  { label: 'Admin', email: 'admin@ysc.co.th', password: 'admin1234' },
-];
 
 const NAVY = '#14264E';
 const YELLOW = '#EFB419';
@@ -146,29 +141,6 @@ export default function POSLogin() {
             <span className="text-neutral-400">เฉพาะบุคลากรที่ได้รับอนุญาตเท่านั้น</span>
             <button className="text-sky-500 hover:underline font-medium">ลืมรหัสผ่าน?</button>
           </div>
-
-          {/* Dev shortcuts */}
-          {import.meta.env.DEV && (
-            <div className="mt-6 rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4">
-              <div className="flex items-center gap-2 mb-3 text-xs font-bold text-amber-700">
-                <FlaskConical className="w-3.5 h-3.5" /> DEV — บัญชีทดสอบ
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                {DEV_USERS.map(u => (
-                  <button key={u.email} type="button"
-                    onClick={() => { setEmail(u.email); setPassword(u.password); setError(''); }}
-                    className="px-3 h-8 rounded-lg bg-white border border-amber-200 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition">
-                    {u.label}
-                  </button>
-                ))}
-                <button type="button"
-                  onClick={() => navigate('/')}
-                  className="px-3 h-8 rounded-lg bg-amber-400 text-xs font-bold text-amber-900 hover:bg-amber-500 transition">
-                  ข้ามเข้า POS →
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
