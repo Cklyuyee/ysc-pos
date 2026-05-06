@@ -3,10 +3,52 @@ import { Search, X, Tag, Package, TrendingUp, History, Plus, Minus, ShoppingCart
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Product, searchProducts, applyPriceTier } from '../../api/mock/products';
-import { Category, getCategories } from '../../api/mock/categories';
-import { BillPromotion } from '../../api/mock/promotions';
-import { BrandPromotion, getActiveBrandPromotions } from '../../api/mock/brandPromotions';
+import type { Product } from '../../api/mock/products';
+import type { Category } from '../../api/mock/categories';
+import type { BillPromotion } from '../../api/mock/promotions';
+import type { BrandPromotion } from '../../api/mock/brandPromotions';
+import { searchProducts as apiSearchProducts, type ApiProduct } from '../../../services/productsApi';
+
+// Map API product to the mock Product shape consumed by this dialog's UI
+function apiToMockProduct(p: ApiProduct): Product {
+  return {
+    id: p.id,
+    sku: p.sku,
+    barcode: p.barcode,
+    name: p.name,
+    price: p.standardPrice,
+    prices: { P5: p.standardPrice },
+    unit: p.unit,
+    tax: 'V',
+    attr: [],
+    image: p.image ?? '',
+    stock: Math.max(0, p.stockOffline - p.reservedOffline),
+    variant: '',
+    category: p.category ?? '',
+    brand: p.brand ?? '-',
+  } as Product;
+}
+
+// Live API-backed search that matches the old signature
+async function searchProducts(query: string, _category?: string): Promise<Product[]> {
+  const products = await apiSearchProducts(query);
+  return products.map(apiToMockProduct);
+}
+
+// Lightweight price-tier helper (only P5 is wired for now)
+function applyPriceTier(product: Product, _priceTier: string = 'P5'): Product {
+  return product;
+}
+
+// No /categories endpoint yet — return empty
+async function getCategories(): Promise<Category[]> {
+  return [];
+}
+
+// No brand-level promotions API yet — return empty
+function getActiveBrandPromotions(): BrandPromotion[] {
+  return [];
+}
 import { TaxBadge, AttributeBadge, PromoBadge } from '../badges/ProductBadges';
 import { ProductListItem } from './ProductListItem';
 import { QuantityInput } from '../cart/QuantityInput';
@@ -396,11 +438,6 @@ export function ProductSearchDialog({
             ))}
           </div>
         </div>
-
-        {/* Promotions List */}
-        {activeTab === 'promotions' && (
-          null
-        )}
 
         {/* Main Content Area - Split View */}
         <div className="flex-1 overflow-hidden flex gap-4 px-6 py-4">

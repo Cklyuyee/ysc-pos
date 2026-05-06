@@ -21,7 +21,8 @@ import { PaymentDialog } from './PaymentDialog';
 import { CancelBillDialog } from './CancelBillDialog';
 import { HeldBillsDialog, type HeldBill } from './HeldBillsDialog';
 import { SlipUploadDialog } from './SlipUploadDialog';
-import { ProductPickerDialog } from './ProductPickerDialog';
+import { ProductSearchDialog } from '../../components/product/ProductSearchDialog';
+import type { Product as MockProduct } from '../../api/mock/products';
 import type { Customer } from '../../../data/customers';
 
 const NAVY = '#14264E';
@@ -194,7 +195,6 @@ export default function POSScreen() {
   const [pendingSlipOrderId, setPendingSlipOrderId] = useState<string | null>(null);
   const [pendingSlipAmount, setPendingSlipAmount] = useState(0);
   const [showPicker, setShowPicker] = useState(false);
-  const [pickerInitialQuery, setPickerInitialQuery] = useState('');
   const barcodeRef = useRef<HTMLInputElement>(null);
   const qtyRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -549,11 +549,27 @@ export default function POSScreen() {
         onUploaded={handleSlipUploaded}
       />
 
-      <ProductPickerDialog
+      <ProductSearchDialog
         open={showPicker}
-        initialQuery={pickerInitialQuery}
         onClose={() => setShowPicker(false)}
-        onSelect={(p, qty) => { void handlePickerSelect(p, qty); }}
+        onSelectProduct={(mockP: MockProduct, qty: number) => {
+          // ProductSearchDialog operates on the mock Product shape; map back to ApiProduct
+          const apiProduct: ApiProduct = {
+            id: mockP.id,
+            sku: mockP.sku,
+            name: mockP.name,
+            barcode: mockP.barcode,
+            standardPrice: mockP.price,
+            unit: mockP.unit,
+            brand: mockP.brand,
+            category: mockP.category,
+            stockOffline: mockP.stock,
+            reservedOffline: 0,
+            image: mockP.image,
+          };
+          void handlePickerSelect(apiProduct, qty);
+        }}
+        priceTier={customer?.priceTier ?? 'P5'}
       />
 
       {/* Top bar */}
@@ -599,7 +615,7 @@ export default function POSScreen() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              <FKey hotkey="F1" label="ค้นหาสินค้า"   icon={Search}   onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }} />
+              <FKey hotkey="F1" label="ค้นหาสินค้า"   icon={Search}   onClick={() => { setShowPicker(true); }} />
               <FKey hotkey="F2" label="เปลี่ยนลูกค้า"  icon={RefreshCw} onClick={() => setShowCustomerSearch(true)} />
               <FKey hotkey="F3" label="ยกเลิกรายการ"   icon={XCircle}  onClick={handleClearItems} />
               <FKey hotkey="F4" label="ยกเลิกบิล"      icon={Ban}      onClick={() => cartItems.length > 0 && setShowCancel(true)} />
@@ -643,7 +659,7 @@ export default function POSScreen() {
                 )}
               </div>
               <Button size="lg" className="h-12 px-6 font-bold hover:opacity-90 shrink-0"
-                style={{ backgroundColor: YELLOW, color: NAVY }} onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }}>
+                style={{ backgroundColor: YELLOW, color: NAVY }} onClick={() => { setShowPicker(true); }}>
                 <Search className="w-4 h-4" /> ค้นหาเพิ่มเติม
               </Button>
             </div>
