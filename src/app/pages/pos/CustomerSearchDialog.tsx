@@ -30,6 +30,7 @@ export function CustomerSearchDialog({ open, onClose, onSelect, onRegister }: Pr
   const [nameQuery, setNameQuery] = useState('');
   const [results, setResults] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const codeRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -39,10 +40,15 @@ export function CustomerSearchDialog({ open, onClose, onSelect, onRegister }: Pr
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
+      setErrorMsg('');
       try {
         const res = await searchCustomers(query);
         setResults(res.map(apiCustomerToCustomer));
-      } catch {
+      } catch (err: unknown) {
+        console.error('[CustomerSearch] failed', err);
+        const status = (err as { status?: number }).status;
+        const msg = (err as Error).message ?? '';
+        setErrorMsg(status ? `ค้นหาไม่สำเร็จ (HTTP ${status}) — ${msg}` : `ค้นหาไม่สำเร็จ — ${msg || 'network error'}`);
         setResults([]);
       } finally {
         setLoading(false);
@@ -138,6 +144,11 @@ export function CustomerSearchDialog({ open, onClose, onSelect, onRegister }: Pr
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : errorMsg ? (
+            <div className="mx-6 my-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <div className="font-bold mb-1">⚠️ {errorMsg}</div>
+              <div className="text-xs text-rose-600">เปิด DevTools (F12) → Console / Network เพื่อดูรายละเอียด</div>
             </div>
           ) : results.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-neutral-400">

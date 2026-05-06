@@ -221,8 +221,12 @@ export default function POSScreen() {
           setCartId(fresh.id);
           setCartItems([]);
         }
-      } catch {
-        // If API not available, proceed with null cartId
+      } catch (err: unknown) {
+        console.error('[POSScreen] failed to init cart', err);
+        const e = err as { status?: number; message?: string };
+        showError(e.status
+          ? `โหลด cart ไม่สำเร็จ (HTTP ${e.status}): ${e.message ?? ''}`
+          : `เชื่อมต่อ API ไม่ได้: ${e.message ?? ''}`);
       }
     })();
   }, []);
@@ -234,7 +238,7 @@ export default function POSScreen() {
 
   const showError = (msg: string) => {
     setErrorMsg(msg);
-    setTimeout(() => setErrorMsg(''), 4000);
+    setTimeout(() => setErrorMsg(''), 8000);
   };
 
   const handleBarcodeSubmit = async () => {
@@ -266,9 +270,13 @@ export default function POSScreen() {
       setPendingQty(1);
       qtyRef.current?.select();
     } catch (err: unknown) {
-      const status = (err as { status?: number }).status;
-      if (status === 409) showError('สต็อกสินค้าไม่เพียงพอ');
-      else showError('เกิดข้อผิดพลาด กรุณาลองใหม่');
+      console.error('[handleBarcodeSubmit] failed', err);
+      const e = err as { status?: number; message?: string };
+      if (e.status === 409) showError('สต็อกสินค้าไม่เพียงพอ');
+      else if (e.status === 403) showError('ไม่มีสิทธิ์เข้าถึงข้อมูลสินค้า (403)');
+      else if (e.status === 404) showError('ไม่พบสินค้า');
+      else if (e.status) showError(`API error ${e.status}: ${e.message ?? ''}`);
+      else showError(`เชื่อมต่อ API ไม่ได้: ${e.message ?? ''}`);
     } finally {
       setApiLoading(false);
     }
