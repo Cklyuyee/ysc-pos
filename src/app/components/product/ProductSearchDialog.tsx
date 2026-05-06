@@ -61,6 +61,8 @@ interface ProductSearchDialogProps {
   customerFrequentProducts?: Product[];
   activePromotions?: BillPromotion[];
   priceTier?: string;
+  /** Pre-fill the name search field and switch to the search tab */
+  initialQuery?: string;
 }
 
 interface TempCartItem {
@@ -76,6 +78,7 @@ export function ProductSearchDialog({
   customerFrequentProducts = [],
   activePromotions = [],
   priceTier = 'P5',
+  initialQuery = '',
 }: ProductSearchDialogProps) {
   // Helper: apply customer's price tier to any product
   const withTier = (p: Product) => applyPriceTier(p, priceTier);
@@ -111,13 +114,17 @@ export function ProductSearchDialog({
     setBrandPromotions(brandPromos);
   }, []);
 
-  // Reset temp cart when dialog opens
+  // Reset temp cart + seed search query when dialog opens
   useEffect(() => {
     if (open) {
       setTempCart([]);
       setSelectedProductQty({});
+      if (initialQuery) {
+        setNameQuery(initialQuery);
+        setActiveTab('search');
+      }
     }
-  }, [open]);
+  }, [open, initialQuery]);
 
   // Extract unique brands from search results
   useEffect(() => {

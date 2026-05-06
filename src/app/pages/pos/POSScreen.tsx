@@ -195,6 +195,7 @@ export default function POSScreen() {
   const [pendingSlipOrderId, setPendingSlipOrderId] = useState<string | null>(null);
   const [pendingSlipAmount, setPendingSlipAmount] = useState(0);
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerInitialQuery, setPickerInitialQuery] = useState('');
   const barcodeRef = useRef<HTMLInputElement>(null);
   const qtyRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -301,24 +302,25 @@ export default function POSScreen() {
     if (!q) { showError('กรุณาสแกนบาร์โค้ดหรือพิมพ์ SKU'); barcodeRef.current?.focus(); return; }
     setApiLoading(true);
     try {
-      // 1) Look up product (no cart needed)
+      // 1) Look up product. Only treat as exact match when sku or barcode equals q
+      // (the /products?barcode= filter currently isn't strict on the backend, so we
+      //  must verify before adding — otherwise we could grab an unrelated product).
       const byBarcode = await getProductByBarcode(q);
-      let sku = q;
-      if (byBarcode.length > 0) {
-        const p = byBarcode[0];
-        setProductMap(prev => new Map(prev).set(p.sku, p));
-        sku = p.sku;
-      } else {
+      let exact = byBarcode.find(p => p.sku === q || p.barcode === q);
+      if (!exact) {
         const bySearch = await searchProducts(q);
-        const exact = bySearch.find(p => p.sku === q || p.barcode === q);
-        if (exact) {
-          setProductMap(prev => new Map(prev).set(exact.sku, exact));
-          sku = exact.sku;
-        } else {
-          showError('ไม่พบสินค้า');
-          return;
-        }
+        exact = bySearch.find(p => p.sku === q || p.barcode === q);
       }
+      if (!exact) {
+        // No exact match — open the picker dialog seeded with the query so the
+        // cashier can pick from search results instead of seeing a dead end.
+        setApiLoading(false);
+        setPickerInitialQuery(q);
+        setShowPicker(true);
+        return;
+      }
+      setProductMap(prev => new Map(prev).set(exact!.sku, exact!));
+      const sku = exact.sku;
       // 2) Now we need a cart to add the item — lazy init if missing
       const id = await ensureCartId();
       if (!id) return;
@@ -551,6 +553,7 @@ export default function POSScreen() {
 
       <ProductSearchDialog
         open={showPicker}
+        initialQuery={pickerInitialQuery}
         onClose={() => setShowPicker(false)}
         onSelectProduct={(mockP: MockProduct, qty: number) => {
           // ProductSearchDialog operates on the mock Product shape; map back to ApiProduct
@@ -615,7 +618,7 @@ export default function POSScreen() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              <FKey hotkey="F1" label="ค้นหาสินค้า"   icon={Search}   onClick={() => { setShowPicker(true); }} />
+              <FKey hotkey="F1" label="ค้นหาสินค้า"   icon={Search}   onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }} />
               <FKey hotkey="F2" label="เปลี่ยนลูกค้า"  icon={RefreshCw} onClick={() => setShowCustomerSearch(true)} />
               <FKey hotkey="F3" label="ยกเลิกรายการ"   icon={XCircle}  onClick={handleClearItems} />
               <FKey hotkey="F4" label="ยกเลิกบิล"      icon={Ban}      onClick={() => cartItems.length > 0 && setShowCancel(true)} />
@@ -659,7 +662,7 @@ export default function POSScreen() {
                 )}
               </div>
               <Button size="lg" className="h-12 px-6 font-bold hover:opacity-90 shrink-0"
-                style={{ backgroundColor: YELLOW, color: NAVY }} onClick={() => { setShowPicker(true); }}>
+                style={{ backgroundColor: YELLOW, color: NAVY }} onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }}>
                 <Search className="w-4 h-4" /> ค้นหาเพิ่มเติม
               </Button>
             </div>
