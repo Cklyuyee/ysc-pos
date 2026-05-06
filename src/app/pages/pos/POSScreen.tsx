@@ -237,27 +237,10 @@ export default function POSScreen() {
     setTimeout(() => setErrorMsg(''), 4000);
   };
 
-  const handleAddBySku = async (sku: string, qty: number) => {
-    if (!cartId) return;
-    setApiLoading(true);
-    try {
-      const [products, updated] = await Promise.all([searchProducts(sku), addItem(cartId, sku, qty)]);
-      const found = products.find(p => p.sku === sku || p.barcode === sku);
-      if (found) setProductMap(prev => new Map(prev).set(found.sku, found));
-      applyCartResponse(updated);
-    } catch (err: unknown) {
-      const status = (err as { status?: number }).status;
-      if (status === 409) showError('สต็อกสินค้าไม่เพียงพอ');
-      else if (status === 404) showError('ไม่พบสินค้า');
-      else showError('เกิดข้อผิดพลาด กรุณาลองใหม่');
-    } finally {
-      setApiLoading(false);
-    }
-  };
-
   const handleBarcodeSubmit = async () => {
     const q = barcodeInput.trim();
-    if (!q || !cartId) return;
+    if (!cartId) { showError('ระบบยังไม่พร้อม กรุณารอสักครู่'); return; }
+    if (!q) { showError('กรุณาสแกนบาร์โค้ดหรือพิมพ์ SKU'); barcodeRef.current?.focus(); return; }
     setApiLoading(true);
     try {
       const byBarcode = await getProductByBarcode(q);
@@ -534,10 +517,7 @@ export default function POSScreen() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap justify-end">
-              <FKey hotkey="F1" label="ค้นหาสินค้า"   icon={Search}   onClick={async () => {
-                const q = barcodeInput.trim();
-                if (q) { await handleBarcodeSubmit(); }
-              }} />
+              <FKey hotkey="F1" label="ค้นหาสินค้า"   icon={Search}   onClick={() => { barcodeRef.current?.focus(); barcodeRef.current?.select(); }} />
               <FKey hotkey="F2" label="เปลี่ยนลูกค้า"  icon={RefreshCw} onClick={() => setShowCustomerSearch(true)} />
               <FKey hotkey="F3" label="ยกเลิกรายการ"   icon={XCircle}  onClick={handleClearItems} />
               <FKey hotkey="F4" label="ยกเลิกบิล"      icon={Ban}      onClick={() => cartItems.length > 0 && setShowCancel(true)} />
@@ -581,7 +561,7 @@ export default function POSScreen() {
                 )}
               </div>
               <Button size="lg" className="h-12 px-6 font-bold hover:opacity-90 shrink-0"
-                style={{ backgroundColor: YELLOW, color: NAVY }} onClick={() => handleAddBySku(barcodeInput.trim(), pendingQty)}>
+                style={{ backgroundColor: YELLOW, color: NAVY }} onClick={() => { void handleBarcodeSubmit(); }}>
                 <Plus className="w-4 h-4" /> เพิ่มสินค้า
               </Button>
             </div>
