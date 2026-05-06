@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Search, X, UserCheck, Phone, Mail, CreditCard, UserPlus } from 'lucide-react';
-import { CustomersAPI } from '../../../services/mockApi';
+import { searchCustomers, apiCustomerToCustomer } from '../../../services/customersApi';
 import type { Customer } from '../../../data/customers';
 
 const NAVY = '#14264E';
@@ -28,32 +28,54 @@ interface Props {
 export function CustomerSearchDialog({ open, onClose, onSelect, onRegister }: Props) {
   const [codeQuery, setCodeQuery] = useState('');
   const [nameQuery, setNameQuery] = useState('');
-  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [results, setResults] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const doSearch = useCallback((code: string, name: string) => {
+    const query = [code.trim(), name.trim()].filter(Boolean).join(' ');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await searchCustomers(query);
+        setResults(res.map(apiCustomerToCustomer));
+      } catch {
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+  }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+      return;
+    }
     setCodeQuery('');
     setNameQuery('');
-    setTimeout(() => codeRef.current?.focus(), 50);
-    setLoading(true);
-    CustomersAPI.getAll({ limit: 200 }).then(res => {
-      setAllCustomers(res.customers);
-      setLoading(false);
-    });
+    setResults([]);
+    focusTimerRef.current = setTimeout(() => codeRef.current?.focus(), 50);
+    doSearch('', '');
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+    };
   }, [open]);
 
-  const results = allCustomers.filter(c => {
-    const codeMatch = !codeQuery.trim() ||
-      c.code.toLowerCase().includes(codeQuery.trim().toLowerCase()) ||
-      c.id.toLowerCase().includes(codeQuery.trim().toLowerCase());
-    const nameMatch = !nameQuery.trim() ||
-      c.name.toLowerCase().includes(nameQuery.trim().toLowerCase()) ||
-      c.phone.includes(nameQuery.trim()) ||
-      c.email.toLowerCase().includes(nameQuery.trim().toLowerCase());
-    return codeMatch && nameMatch;
-  });
+  const handleCodeChange = (val: string) => {
+    setCodeQuery(val);
+    doSearch(val, nameQuery);
+  };
+
+  const handleNameChange = (val: string) => {
+    setNameQuery(val);
+    doSearch(codeQuery, val);
+  };
 
   if (!open) return null;
 
@@ -81,12 +103,12 @@ export function CustomerSearchDialog({ open, onClose, onSelect, onRegister }: Pr
               <input
                 ref={codeRef}
                 value={codeQuery}
-                onChange={e => setCodeQuery(e.target.value)}
+                onChange={e => handleCodeChange(e.target.value)}
                 placeholder="เช่น C101, C002..."
                 className="w-full h-10 pl-9 pr-8 border-2 border-neutral-200 rounded-xl text-sm outline-none focus:border-amber-400 transition font-mono"
               />
               {codeQuery && (
-                <button onClick={() => setCodeQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
+                <button onClick={() => handleCodeChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
@@ -98,12 +120,12 @@ export function CustomerSearchDialog({ open, onClose, onSelect, onRegister }: Pr
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
               <input
                 value={nameQuery}
-                onChange={e => setNameQuery(e.target.value)}
+                onChange={e => handleNameChange(e.target.value)}
                 placeholder="ชื่อ, 089-xxx, email..."
                 className="w-full h-10 pl-9 pr-8 border-2 border-neutral-200 rounded-xl text-sm outline-none focus:border-amber-400 transition"
               />
               {nameQuery && (
-                <button onClick={() => setNameQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
+                <button onClick={() => handleNameChange('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}

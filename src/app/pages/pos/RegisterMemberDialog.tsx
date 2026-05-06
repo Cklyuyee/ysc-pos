@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, User, Building2, Phone, Check, AlertTriangle, AlertCircle } from 'lucide-react';
-import { MOCK_CUSTOMERS } from '../../../data/customers';
+import { searchCustomers, createCustomer, apiCustomerToCustomer } from '../../../services/customersApi';
 import type { Customer } from '../../../data/customers';
 
 const NAVY = '#14264E';
@@ -13,27 +13,6 @@ interface Props {
 }
 
 type CustomerType = 'personal' | 'business';
-
-function findSimilarCompanies(query: string): Customer[] {
-  if (query.trim().length < 2) return [];
-  const q = query.trim().toLowerCase();
-  return MOCK_CUSTOMERS.filter(c => {
-    if (c.type !== 'company') return false;
-    const name = c.name.toLowerCase();
-    if (name.includes(q) || q.includes(name)) return true;
-    const words = q.split(/\s+/).filter(w => w.length >= 2);
-    return words.some(w => name.includes(w));
-  }).slice(0, 4);
-}
-
-function findDuplicatePhone(phone: string): Customer | undefined {
-  const normalized = phone.replace(/[-\s]/g, '');
-  if (normalized.length < 9) return undefined;
-  return MOCK_CUSTOMERS.find(c =>
-    c.phone?.replace(/[-\s]/g, '') === normalized ||
-    c.phones?.some(p => p.replace(/[-\s]/g, '') === normalized)
-  );
-}
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -64,20 +43,28 @@ export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
   const [phoneDuplicate, setPhoneDuplicate]   = useState<Customer | undefined>();
   const [similarCompanies, setSimilarCompanies] = useState<Customer[]>([]);
   const [done, setDone]                       = useState(false);
+  const [submitting, setSubmitting]           = useState(false);
 
   const companyDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const phoneDebounce   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstInputRef   = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setType('personal'); setFirstName(''); setLastName('');
     setPhone(''); setCompanyName(''); setErrors({});
-    setPhoneDuplicate(undefined); setSimilarCompanies([]); setDone(false);
+    setPhoneDuplicate(undefined); setSimilarCompanies([]); setDone(false); setSubmitting(false);
   };
 
   useEffect(() => {
-    if (open) setTimeout(() => firstInputRef.current?.focus(), 60);
-    else reset();
+    if (open) {
+      focusTimerRef.current = setTimeout(() => firstInputRef.current?.focus(), 60);
+    } else {
+      if (phoneDebounce.current)   clearTimeout(phoneDebounce.current);
+      if (companyDebounce.current) clearTimeout(companyDebounce.current);
+      if (focusTimerRef.current)   clearTimeout(focusTimerRef.current);
+      reset();
+    }
   }, [open]);
 
   const handlePhoneChange = (val: string) => {
@@ -85,18 +72,40 @@ export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
     setErrors(p => ({ ...p, phone: '' }));
     setPhoneDuplicate(undefined);
     if (phoneDebounce.current) clearTimeout(phoneDebounce.current);
-    phoneDebounce.current = setTimeout(() => {
-      setPhoneDuplicate(findDuplicatePhone(val));
-    }, 400);
+    const normalized = val.replace(/[-\s]/g, '');
+    if (normalized.length >= 9) {
+      phoneDebounce.current = setTimeout(async () => {
+        try {
+          const res = await searchCustomers(normalized);
+          const dup = res.find(c => (c.phone ?? '').replace(/[-\s]/g, '') === normalized);
+          if (dup) setPhoneDuplicate(apiCustomerToCustomer(dup));
+        } catch {
+          // ignore — don't block registration on lookup failure
+        }
+      }, 400);
+    }
   };
 
   const handleCompanyChange = (val: string) => {
     setCompanyName(val);
     setErrors(p => ({ ...p, companyName: '' }));
     if (companyDebounce.current) clearTimeout(companyDebounce.current);
-    companyDebounce.current = setTimeout(() => {
-      setSimilarCompanies(findSimilarCompanies(val));
-    }, 300);
+    if (val.trim().length >= 2) {
+      companyDebounce.current = setTimeout(async () => {
+        try {
+          const res = await searchCustomers(val.trim());
+          const similar = res
+            .filter(c => c.type === 'company' || c.type === 'business')
+            .slice(0, 4)
+            .map(apiCustomerToCustomer);
+          setSimilarCompanies(similar);
+        } catch {
+          setSimilarCompanies([]);
+        }
+      }, 300);
+    } else {
+      setSimilarCompanies([]);
+    }
   };
 
   const handleClose = () => { reset(); onClose(); };
@@ -115,25 +124,30 @@ export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (!validate()) return;
-    const newId = `C${Date.now()}`;
+  const handleSubmit = async () => {
+    if (!validate() || submitting) return;
+    setSubmitting(true);
     const fullName = type === 'business'
       ? companyName.trim()
       : `${firstName.trim()} ${lastName.trim()}`;
-
-    const mockCustomer: Customer = {
-      id: newId, code: newId, name: fullName,
-      contactPerson: type === 'business' ? `${firstName.trim()} ${lastName.trim()}` : undefined,
-      phone: phone.trim(), email: '',
-      tier: 'Silver', priceTier: 'P5',
-      creditLimit: 0, creditUsed: 0, rewardPoints: 0,
-      address: '', subDistrict: '', district: '', province: '', postalCode: '',
-      type: type === 'business' ? 'company' : 'person',
-    } as unknown as Customer;
-
-    setDone(true);
-    setTimeout(() => { onRegistered(mockCustomer); handleClose(); }, 1100);
+    const contactPerson = type === 'business'
+      ? `${firstName.trim()} ${lastName.trim()}`
+      : undefined;
+    try {
+      const newCustomer = await createCustomer({
+        name: fullName,
+        phone: phone.trim(),
+        type: type === 'business' ? 'company' : 'person',
+        ...(contactPerson ? { contactPerson } : {}),
+      });
+      setDone(true);
+      setTimeout(() => { onRegistered(apiCustomerToCustomer(newCustomer)); handleClose(); }, 1100);
+    } catch (err: unknown) {
+      const msg = (err as Error).message ?? 'เกิดข้อผิดพลาด';
+      setErrors(p => ({ ...p, phone: msg }));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!open) return null;
@@ -275,10 +289,14 @@ export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
             className="flex-1 h-11 rounded-xl border-2 border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50 transition">
             ยกเลิก
           </button>
-          <button onClick={handleSubmit} disabled={done || !!phoneDuplicate}
+          <button onClick={handleSubmit} disabled={done || !!phoneDuplicate || submitting}
             className="flex-1 h-11 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ backgroundColor: done ? '#22c55e' : YELLOW, color: done ? 'white' : NAVY }}>
-            {done ? <><Check className="w-4 h-4" /> สมัครสำเร็จ!</> : 'สมัครสมาชิก'}
+            {done
+              ? <><Check className="w-4 h-4" /> สมัครสำเร็จ!</>
+              : submitting
+                ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                : 'สมัครสมาชิก'}
           </button>
         </div>
       </div>

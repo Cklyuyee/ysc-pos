@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, FlaskConical } from 'lucide-react';
+import { signIn } from '../../../services/authApi';
+
+const DEV_USERS = [
+  { label: 'POS Staff', email: 'pos@ysc.co.th', password: 'pos1234' },
+  { label: 'Admin', email: 'admin@ysc.co.th', password: 'admin1234' },
+];
 
 const NAVY = '#14264E';
 const YELLOW = '#EFB419';
@@ -13,11 +19,6 @@ export default function POSLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const MOCK_USERS = [
-    { username: 'admin', password: 'pos1234', name: 'Admin' },
-    { username: 'staff', password: '1234', name: 'Staff' },
-  ];
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
@@ -26,17 +27,19 @@ export default function POSLogin() {
     }
     setLoading(true);
     setError('');
-    await new Promise(r => setTimeout(r, 700));
-    const match = MOCK_USERS.find(
-      u => u.username === email.trim() && u.password === password,
-    );
-    if (!match) {
+    try {
+      await signIn(email.trim(), password);
+      navigate('/pos');
+    } catch (err: unknown) {
+      const status = (err as { status?: number }).status;
+      if (status === 401 || status === 400) {
+        setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+      } else {
+        setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+      }
+    } finally {
       setLoading(false);
-      setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-      return;
     }
-    setLoading(false);
-    navigate('/pos');
   };
 
   return (
@@ -139,18 +142,33 @@ export default function POSLogin() {
             </button>
           </form>
 
-          <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <div className="font-bold mb-1">บัญชีสำหรับทดสอบ</div>
-            <div className="flex flex-col gap-0.5 font-mono text-xs">
-              <span>admin / pos1234</span>
-              <span>staff / 1234</span>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between mt-5 text-sm">
+          <div className="flex items-center justify-between mt-6 text-sm">
             <span className="text-neutral-400">เฉพาะบุคลากรที่ได้รับอนุญาตเท่านั้น</span>
             <button className="text-sky-500 hover:underline font-medium">ลืมรหัสผ่าน?</button>
           </div>
+
+          {/* Dev shortcuts */}
+          {import.meta.env.DEV && (
+            <div className="mt-6 rounded-xl border border-dashed border-amber-300 bg-amber-50 p-4">
+              <div className="flex items-center gap-2 mb-3 text-xs font-bold text-amber-700">
+                <FlaskConical className="w-3.5 h-3.5" /> DEV — บัญชีทดสอบ
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {DEV_USERS.map(u => (
+                  <button key={u.email} type="button"
+                    onClick={() => { setEmail(u.email); setPassword(u.password); setError(''); }}
+                    className="px-3 h-8 rounded-lg bg-white border border-amber-200 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition">
+                    {u.label}
+                  </button>
+                ))}
+                <button type="button"
+                  onClick={() => navigate('/')}
+                  className="px-3 h-8 rounded-lg bg-amber-400 text-xs font-bold text-amber-900 hover:bg-amber-500 transition">
+                  ข้ามเข้า POS →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
