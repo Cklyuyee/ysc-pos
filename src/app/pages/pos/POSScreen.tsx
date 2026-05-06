@@ -211,15 +211,23 @@ export default function POSScreen() {
 
   useEffect(() => {
     (async () => {
+      // Try GET /pos/cart/active first; if backend errors (e.g. 500),
+      // fall back to POST /pos/cart which is idempotent per spec
+      // ("If the staff already has an active cart, returns the existing one").
+      let active: PosCart | null = null;
       try {
-        const active = await getActiveCart();
+        active = await getActiveCart();
+      } catch (err: unknown) {
+        console.warn('[POSScreen] getActiveCart failed, falling back to createCart', err);
+      }
+      try {
         if (active && active.status === 'active') {
           setCartId(active.id);
           setCartItems(active.items);
         } else {
           const fresh = await createCart();
           setCartId(fresh.id);
-          setCartItems([]);
+          setCartItems(fresh.items ?? []);
         }
       } catch (err: unknown) {
         console.error('[POSScreen] failed to init cart', err);
