@@ -1,6 +1,39 @@
 import { apiFetch } from './apiClient'
 import type { Customer } from '../data/customers'
 
+// Raw API shape — mirrors backoffice src/app/api/customers.ts
+interface RawApiCustomer {
+  id: string
+  custCode: string
+  custType: string
+  name: string
+  taxId: string | null
+  phone: string | null
+  phones: string[] | null
+  email: string | null
+  contactPerson: string | null
+  memberTier: string
+  priceTier: string
+  totalSpent: string
+  rewardPoints: number
+  pointsExpiring: number | null
+  pointsExpiryDate: string | null
+  creditLimit: string
+  creditUsed: string
+  docType: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+}
+
+interface ApiCustomersResponse {
+  data: RawApiCustomer[]
+  total: number
+  page: number
+  limit: number
+}
+
+// Public shape used by POS app — flatter, with numbers parsed
 export interface ApiCustomer {
   id: string
   code: string
@@ -14,6 +47,61 @@ export interface ApiCustomer {
   rewardPoints?: number
   type?: string
   contactPerson?: string
+  docType?: string
+}
+
+function normalize(r: RawApiCustomer): ApiCustomer {
+  return {
+    id: r.id,
+    code: r.custCode,
+    name: r.name,
+    phone: r.phone ?? undefined,
+    email: r.email ?? undefined,
+    tier: r.memberTier,
+    priceTier: r.priceTier,
+    creditLimit: Number(r.creditLimit),
+    creditUsed: Number(r.creditUsed),
+    rewardPoints: r.rewardPoints,
+    type: r.custType,
+    contactPerson: r.contactPerson ?? undefined,
+    docType: r.docType ?? undefined,
+  }
+}
+
+export const searchCustomers = async (query: string): Promise<ApiCustomer[]> => {
+  const res = await apiFetch<ApiCustomersResponse>(`/customers?search=${encodeURIComponent(query)}&limit=50`)
+  return (res?.data ?? []).map(normalize)
+}
+
+export const getCustomer = async (id: string): Promise<ApiCustomer> => {
+  const res = await apiFetch<RawApiCustomer>(`/customers/${id}`)
+  return normalize(res)
+}
+
+export const createCustomer = async (data: {
+  name: string
+  phone: string
+  email?: string
+  type?: string
+  contactPerson?: string
+}): Promise<ApiCustomer> => {
+  const custCode = `WALK-${Date.now().toString(36).toUpperCase()}`
+  const payload = {
+    custCode,
+    custType: data.type === 'company' || data.type === 'business' ? 'company' : 'person',
+    name: data.name,
+    phone: data.phone,
+    ...(data.email ? { email: data.email } : {}),
+    ...(data.contactPerson ? { contactPerson: data.contactPerson } : {}),
+    memberTier: 'Silver',
+    priceTier: 'P5',
+    registrationChannel: 'Walk-in',
+  }
+  const res = await apiFetch<RawApiCustomer>('/customers', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+  return normalize(res)
 }
 
 export function apiCustomerToCustomer(c: ApiCustomer): Customer {
@@ -37,21 +125,3 @@ export function apiCustomerToCustomer(c: ApiCustomer): Customer {
     postalCode: '',
   } as unknown as Customer
 }
-
-export const searchCustomers = (query: string) =>
-  apiFetch<ApiCustomer[]>(`/customers?search=${encodeURIComponent(query)}`)
-
-export const getCustomer = (id: string) =>
-  apiFetch<ApiCustomer>(`/customers/${id}`)
-
-export const createCustomer = (data: {
-  name: string
-  phone: string
-  email?: string
-  type?: string
-  contactPerson?: string
-}) =>
-  apiFetch<ApiCustomer>('/customers', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  })
