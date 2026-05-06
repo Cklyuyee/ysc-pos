@@ -744,7 +744,7 @@ export default function POSScreen() {
                 )}
               </div>
               <Button size="lg" className="h-12 px-6 font-bold hover:opacity-90 shrink-0"
-                style={{ backgroundColor: YELLOW, color: NAVY }} onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }}>
+                style={{ backgroundColor: '#0EA5E9', color: '#FFFFFF' }} onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }}>
                 <Search className="w-4 h-4" /> ค้นหาเพิ่มเติม
               </Button>
             </div>
