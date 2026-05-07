@@ -3,8 +3,8 @@ import { Search, X, UserCheck, Phone, Mail, CreditCard, UserPlus } from 'lucide-
 import { searchCustomers, apiCustomerToCustomer } from '../../../services/customersApi';
 import type { Customer } from '../../../data/customers';
 
-const NAVY = '#14264E';
-const YELLOW = '#EFB419';
+const NAVY = '#081E6A';
+const YELLOW = '#FFC518';
 
 const TIER_STYLE: Record<string, { bg: string; text: string; label: string }> = {
   'Gold 1':    { bg: 'bg-amber-100',  text: 'text-amber-800',  label: 'Gold' },

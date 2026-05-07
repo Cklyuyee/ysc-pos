@@ -3,8 +3,8 @@ import { X, User, Building2, Phone, Check, AlertTriangle, AlertCircle } from 'lu
 import { searchCustomers, createCustomer, apiCustomerToCustomer } from '../../../services/customersApi';
 import type { Customer } from '../../../data/customers';
 
-const NAVY = '#14264E';
-const YELLOW = '#EFB419';
+const NAVY = '#081E6A';
+const YELLOW = '#FFC518';
 
 interface Props {
   open: boolean;

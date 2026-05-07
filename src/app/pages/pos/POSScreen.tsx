@@ -25,9 +25,9 @@ import { ProductSearchDialog } from '../../components/product/ProductSearchDialo
 import type { Product as MockProduct } from '../../api/mock/products';
 import type { Customer } from '../../../data/customers';
 
-const NAVY = '#14264E';
-const NAVY_SOFT = '#1B3060';
-const YELLOW = '#EFB419';
+const NAVY = '#081E6A';
+const NAVY_SOFT = '#0F2A8C';
+const YELLOW = '#FFC518';
 
 const fmt = (n: number) =>
   '฿' + n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -744,7 +744,7 @@ export default function POSScreen() {
                 )}
               </div>
               <Button size="lg" className="h-12 px-6 font-bold hover:opacity-90 shrink-0"
-                style={{ backgroundColor: '#0EA5E9', color: '#FFFFFF' }} onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }}>
+                style={{ backgroundColor: NAVY, color: '#FFFFFF' }} onClick={() => { setPickerInitialQuery(barcodeInput.trim()); setShowPicker(true); }}>
                 <Search className="w-4 h-4" /> ค้นหาเพิ่มเติม
               </Button>
             </div>

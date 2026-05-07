@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router';
 import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { signIn } from '../../../services/authApi';
 
-const NAVY = '#14264E';
-const YELLOW = '#EFB419';
+const NAVY = '#081E6A';
+const YELLOW = '#FFC518';
 
 export default function POSLogin() {
   const navigate = useNavigate();

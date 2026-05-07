@@ -2,8 +2,8 @@ import { X, Inbox, RotateCcw, Trash2, Clock, ShoppingCart } from 'lucide-react';
 import type { Customer } from '../../../data/customers';
 import type { Product } from '../../api/mock/products';
 
-const NAVY = '#14264E';
-const YELLOW = '#EFB419';
+const NAVY = '#081E6A';
+const YELLOW = '#FFC518';
 
 export interface HeldBill {
   id: string;

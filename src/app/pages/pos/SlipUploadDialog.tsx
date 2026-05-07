@@ -3,8 +3,8 @@ import { X, Upload, Check, AlertCircle, Image as ImageIcon, Building2 } from 'lu
 import { uploadSlip } from '../../../services/ordersApi';
 import { getBankAccounts, type ApiBankAccount } from '../../../services/configApi';
 
-const NAVY = '#14264E';
-const YELLOW = '#EFB419';
+const NAVY = '#081E6A';
+const YELLOW = '#FFC518';
 
 const fmt = (n: number) =>
   '฿' + n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

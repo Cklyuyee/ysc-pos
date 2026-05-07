@@ -5,8 +5,8 @@ import {
 } from 'lucide-react';
 import type { Customer } from '../../../data/customers';
 
-const NAVY = '#14264E';
-const YELLOW = '#EFB419';
+const NAVY = '#081E6A';
+const YELLOW = '#FFC518';
 
 type PayMethod = 'cash' | 'card' | 'credit' | 'qr';
 
