@@ -1,9 +1,9 @@
-import { X, Inbox, RotateCcw, Trash2, Clock, ShoppingCart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Play, Clock, User, IdCard } from 'lucide-react';
 import type { Customer } from '../../../data/customers';
 import type { Product } from '../../api/mock/products';
 
-const NAVY = '#081E6A';
-const YELLOW = '#FFC518';
+const NAVY = '#0B1E8A';
 
 export interface HeldBill {
   id: string;
@@ -11,16 +11,6 @@ export interface HeldBill {
   customer: Customer | null;
   items: { product: Product; qty: number; fulfillment: 'delivery' | 'pickup' }[];
   total: number;
-}
-
-const fmt = (n: number) =>
-  '฿' + n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-function elapsed(date: Date): string {
-  const mins = Math.floor((Date.now() - date.getTime()) / 60000);
-  if (mins < 1) return 'เมื่อกี้';
-  if (mins < 60) return `${mins} นาทีที่แล้ว`;
-  return `${Math.floor(mins / 60)} ชั่วโมงที่แล้ว`;
 }
 
 interface Props {
@@ -31,98 +21,116 @@ interface Props {
   onDelete: (billId: string) => void;
 }
 
-export function HeldBillsDialog({ open, bills, onClose, onRestore, onDelete }: Props) {
+const fmtTime = (d: Date) =>
+  d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+const fmtTotal = (n: number) =>
+  '฿' + n.toLocaleString('th-TH', { maximumFractionDigits: 0 });
+
+export function HeldBillsDialog({ open, bills, onClose, onRestore }: Props) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) setSelectedId(bills[0]?.id ?? null);
+  }, [open, bills]);
+
   if (!open) return null;
+
+  const handleConfirm = () => {
+    const bill = bills.find(b => b.id === selectedId);
+    if (bill) { onRestore(bill); onClose(); }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[520px] mx-4 flex flex-col max-h-[80vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: NAVY }}>
-              <Inbox className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="text-base font-bold" style={{ color: NAVY }}>บิลที่พักไว้</div>
-              <div className="text-xs text-neutral-400">{bills.length} บิล รอดำเนินการ</div>
-            </div>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-[12px] shadow-2xl w-full max-w-[680px] mx-4 flex flex-col max-h-[90vh] overflow-hidden">
+
+        {/* Navy hero header */}
+        <div className="flex flex-col items-center text-center px-6 pt-7 pb-6" style={{ backgroundColor: NAVY }}>
+          <div className="w-20 h-20 rounded-full border-2 border-white flex items-center justify-center mb-4">
+            <Play className="w-9 h-9 text-white fill-white" strokeWidth={0} />
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-400 transition">
-            <X className="w-4 h-4" />
-          </button>
+          <div className="text-h3 text-white">ดึงบิลจากรายการพักบิล</div>
+          <div className="text-b3 text-white/80 mt-1.5">เลือกบิลเพื่อทำรายการต่อ</div>
         </div>
 
-        {/* List */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Body — bill list */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 bg-bg-page-2">
           {bills.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-neutral-400">
-              <Inbox className="w-12 h-12 opacity-20" />
-              <div className="text-sm font-medium">ไม่มีบิลที่พักไว้</div>
-              <div className="text-xs">กด F5 เพื่อพักบิลปัจจุบัน</div>
+            <div className="flex flex-col items-center justify-center py-16 text-text-muted gap-2">
+              <Clock className="w-10 h-10 opacity-30" />
+              <div className="text-b3">ไม่มีบิลที่พักไว้</div>
             </div>
           ) : (
-            <div className="divide-y divide-neutral-100">
-              {bills.map(bill => (
-                <div key={bill.id} className="px-6 py-4 hover:bg-neutral-50 transition">
-                  <div className="flex items-start gap-4">
-                    <div className="w-11 h-11 rounded-xl bg-sky-100 flex items-center justify-center font-bold text-sky-700 text-base shrink-0">
-                      {bill.customer ? bill.customer.name.charAt(0) : <ShoppingCart className="w-5 h-5" />}
+            <div className="flex flex-col gap-3">
+              {bills.map(bill => {
+                const selected = selectedId === bill.id;
+                const itemCount = bill.items.length;
+                return (
+                  <button
+                    key={bill.id}
+                    onClick={() => setSelectedId(bill.id)}
+                    className={`flex items-center gap-4 px-4 py-4 rounded-[12px] border-2 transition text-left ${
+                      selected
+                        ? 'border-brand-navy bg-white shadow-[var(--shadow-card)]'
+                        : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    {/* Time chip */}
+                    <div className="w-14 h-14 rounded-[12px] bg-bg-page flex flex-col items-center justify-center shrink-0">
+                      <Clock className="w-4 h-4 text-text-secondary" strokeWidth={2.2} />
+                      <span className="text-c2 text-text-secondary tabular-nums leading-none mt-1">
+                        {fmtTime(bill.heldAt)}
+                      </span>
                     </div>
+
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-neutral-900">
-                          {bill.customer ? bill.customer.name : 'Walk-in Customer'}
+                      <div className="text-h5 text-text-primary tabular-nums truncate">{bill.id}</div>
+                      <div className="flex items-center gap-4 mt-1 flex-wrap">
+                        <span className="flex items-center gap-1.5 text-c1 text-text-secondary">
+                          <User className="w-4 h-4" />
+                          {bill.customer?.name ?? 'Walk-in'}
                         </span>
-                        <span className="text-[10px] font-mono text-neutral-400">{bill.id}</span>
+                        {bill.customer?.code && (
+                          <span className="flex items-center gap-1.5 text-c1 text-text-secondary">
+                            <IdCard className="w-4 h-4" />
+                            {bill.customer.code}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3 mt-0.5">
-                        <span className="flex items-center gap-1 text-xs text-neutral-500">
-                          <ShoppingCart className="w-3 h-3" />
-                          {bill.items.reduce((s, i) => s + i.qty, 0)} ชิ้น ({bill.items.length} รายการ)
-                        </span>
-                        <span className="flex items-center gap-1 text-xs text-neutral-400">
-                          <Clock className="w-3 h-3" />{elapsed(bill.heldAt)}
-                        </span>
+                      <div className="text-c1 text-text-secondary mt-1">
+                        จำนวน : {itemCount} รายการ
                       </div>
-                      <div className="text-sm font-bold text-neutral-800 tabular-nums mt-1">{fmt(bill.total)}</div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => onDelete(bill.id)}
-                        className="w-8 h-8 rounded-lg bg-neutral-100 hover:bg-rose-100 text-neutral-400 hover:text-rose-600 flex items-center justify-center transition">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => { onRestore(bill); onClose(); }}
-                        className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-bold transition"
-                        style={{ backgroundColor: YELLOW, color: NAVY }}>
-                        <RotateCcw className="w-3.5 h-3.5" /> ดึงบิล
-                      </button>
+
+                    {/* Right total */}
+                    <div className="text-right shrink-0">
+                      <div className="text-h4 text-brand-navy tabular-nums">{fmtTotal(bill.total)}</div>
                     </div>
-                  </div>
-                  <div className="mt-2.5 flex flex-wrap gap-1.5" style={{ marginLeft: '60px' }}>
-                    {bill.items.slice(0, 4).map((item, i) => (
-                      <span key={i} className="text-[11px] text-neutral-500 bg-neutral-100 rounded-md px-2 py-0.5 truncate max-w-[160px]">
-                        {item.product.name} ×{item.qty}
-                      </span>
-                    ))}
-                    {bill.items.length > 4 && (
-                      <span className="text-[11px] text-neutral-400 bg-neutral-100 rounded-md px-2 py-0.5">
-                        +{bill.items.length - 4} รายการ
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-neutral-100 shrink-0 flex items-center justify-between">
-          <span className="text-xs text-neutral-400">บิลที่พักไว้จะถูกลบอัตโนมัติเมื่อปิดระบบ</span>
-          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-neutral-500 rounded-lg hover:bg-neutral-100 transition">
-            ปิด
+        <div className="px-6 py-4 bg-bg-page border-t border-gray-200 flex items-center gap-3 shrink-0">
+          <button
+            onClick={onClose}
+            className="flex-1 h-12 rounded-[12px] border border-gray-300 bg-white text-h5 text-text-primary hover:bg-bg-page-2 transition"
+          >
+            ยกเลิก
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={!selectedId}
+            className="flex-[2] h-12 rounded-[12px] text-h5 text-white transition hover:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ backgroundColor: NAVY }}
+          >
+            ยืนยันการดึงบิล
           </button>
         </div>
       </div>

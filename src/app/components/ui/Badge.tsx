@@ -70,7 +70,7 @@ export const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
       >
         {Icon && <Icon className="h-3.5 w-3.5" />}
         {(label || children) && (
-          <span className="text-xs font-semibold leading-none">{label ?? children}</span>
+          <span className="text-c3 font-semibold leading-none">{label ?? children}</span>
         )}
       </div>
     );

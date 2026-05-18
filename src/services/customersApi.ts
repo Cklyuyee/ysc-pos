@@ -45,6 +45,8 @@ export interface ApiCustomer {
   creditLimit?: number
   creditUsed?: number
   rewardPoints?: number
+  pointsExpiring?: number
+  pointsExpiryDate?: string
   type?: string
   contactPerson?: string
   docType?: string
@@ -62,6 +64,8 @@ function normalize(r: RawApiCustomer): ApiCustomer {
     creditLimit: Number(r.creditLimit),
     creditUsed: Number(r.creditUsed),
     rewardPoints: r.rewardPoints,
+    pointsExpiring: r.pointsExpiring ?? undefined,
+    pointsExpiryDate: r.pointsExpiryDate ?? undefined,
     type: r.custType,
     contactPerson: r.contactPerson ?? undefined,
     docType: r.docType ?? undefined,
@@ -116,6 +120,8 @@ export function apiCustomerToCustomer(c: ApiCustomer): Customer {
     creditLimit: c.creditLimit ?? 0,
     creditUsed: c.creditUsed ?? 0,
     rewardPoints: c.rewardPoints ?? 0,
+    pointsExpiring: c.pointsExpiring,
+    pointsExpiryDate: c.pointsExpiryDate,
     type: (c.type ?? 'person') as Customer['type'],
     contactPerson: c.contactPerson,
     address: '',

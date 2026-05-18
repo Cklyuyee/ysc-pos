@@ -25,7 +25,7 @@ export const TaxBadge = React.forwardRef<HTMLSpanElement, TaxBadgeProps>(
     return (
       <span
         ref={ref}
-        className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold font-sans ${isVatable ? 'bg-neutral-100 text-neutral-600' : 'bg-gray-400 text-white'} ${className}`}
+        className={`inline-flex items-center px-2 py-0.5 rounded-lg text-c3 font-semibold font-sans ${isVatable ? 'bg-neutral-100 text-neutral-600' : 'bg-gray-400 text-white'} ${className}`}
         {...filterProps(props)}
       >
         {taxValue}
@@ -49,7 +49,7 @@ export const AttributeBadge = React.forwardRef<HTMLSpanElement, AttributeBadgePr
     return (
       <span
         ref={ref}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold font-sans ${
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-c3 font-semibold font-sans ${
           isFragile ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'
         } ${className}`}
         {...filterProps(props)}
@@ -72,7 +72,7 @@ export const PromoBadge = React.forwardRef<HTMLSpanElement, PromoBadgeProps>(
     return (
       <span
         ref={ref}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-bold bg-red-50 text-red-600 font-sans ${className}`}
+        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-c3 font-bold bg-red-50 text-red-600 font-sans ${className}`}
         {...filterProps(props)}
       >
         {withIcon && <Tag className="w-3.5 h-3.5" />}

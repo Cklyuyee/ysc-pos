@@ -32,6 +32,8 @@ export interface Address {
   type: AddressType;           // Billing or Shipping address
   label: string;               // "ที่อยู่หลัก" or "สาขา"
   branchName?: string;         // e.g., "สาขาสระแก้ว"
+  contactName?: string;        // recipient name on the shipping label
+  phone?: string;              // recipient phone (used as the courier contact)
   address: string;
   district: string;
   province: string;

@@ -12,7 +12,7 @@
   --popover-foreground: #111827;
 
   /* Primary = Navy (per PDF: Primary Button = Navy bg + white text) */
-  --primary: #081E6A;
+  --primary: #0B1E8A;
   --primary-foreground: #FFFFFF;
 
   --secondary: #F3F4F6;        /* Gray-100 */
@@ -22,7 +22,7 @@
   --muted-foreground: #6D717F; /* Gray-500 */
 
   --accent: #EAF2F8;           /* BG */
-  --accent-foreground: #081E6A;
+  --accent-foreground: #0B1E8A;
 
   --destructive: #FF0000;
   --destructive-foreground: #FFFFFF;
@@ -37,71 +37,175 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  --ring: #081E6A;             /* Navy focus ring */
+  --ring: #0B1E8A;             /* Navy focus ring */
   --radius: 0.5rem;            /* 8px = radius-md */
 }
 
 @theme inline {
   /* ---------- Typography ---------- */
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-heading: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* ---------- Brand / Primary palette ---------- */
-  --color-brand-navy: #081E6A;
-  --color-brand-navy-dark: #040F35;
-  --color-brand-navy-light: #0197FF;   /* mapped to "Blue" per PDF */
+  /* ---------- Type scale (per Figma design system) ---------- */
+  /* Headlines — Bold */
+  --text-h1: 56px;
+  --text-h1--line-height: 64px;
+  --text-h1--font-weight: 700;
+  --text-h1--letter-spacing: 0;
+
+  --text-h2: 44px;
+  --text-h2--line-height: 52px;
+  --text-h2--font-weight: 700;
+  --text-h2--letter-spacing: 0;
+
+  --text-h3: 32px;
+  --text-h3--line-height: 40px;
+  --text-h3--font-weight: 700;
+  --text-h3--letter-spacing: 0;
+
+  --text-h4: 28px;
+  --text-h4--line-height: 36px;
+  --text-h4--font-weight: 700;
+  --text-h4--letter-spacing: 0;
+
+  --text-h5: 24px;
+  --text-h5--line-height: 30px;
+  --text-h5--font-weight: 700;
+  --text-h5--letter-spacing: 0;
+
+  /* Subtitles — Bold */
+  --text-s1: 22px;
+  --text-s1--line-height: 28px;
+  --text-s1--font-weight: 700;
+  --text-s1--letter-spacing: 0;
+
+  --text-s2: 20px;
+  --text-s2--line-height: 26px;
+  --text-s2--font-weight: 700;
+  --text-s2--letter-spacing: 0;
+
+  /* Body */
+  --text-b1: 22px;            /* Regular */
+  --text-b1--line-height: 28px;
+  --text-b1--font-weight: 400;
+  --text-b1--letter-spacing: 0;
+
+  --text-b2: 22px;            /* Medium */
+  --text-b2--line-height: 28px;
+  --text-b2--font-weight: 500;
+  --text-b2--letter-spacing: 0;
+
+  --text-b3: 20px;            /* Regular */
+  --text-b3--line-height: 26px;
+  --text-b3--font-weight: 400;
+  --text-b3--letter-spacing: 0;
+
+  --text-b4: 20px;            /* Medium */
+  --text-b4--line-height: 26px;
+  --text-b4--font-weight: 500;
+  --text-b4--letter-spacing: 0;
+
+  /* Caption */
+  --text-c1: 18px;            /* Regular */
+  --text-c1--line-height: 26px;
+  --text-c1--font-weight: 400;
+  --text-c1--letter-spacing: 0;
+
+  --text-c2: 16px;            /* Medium */
+  --text-c2--line-height: 22px;
+  --text-c2--font-weight: 500;
+  --text-c2--letter-spacing: 0;
+
+  --text-c3: 14px;            /* Medium */
+  --text-c3--line-height: 20px;
+  --text-c3--font-weight: 500;
+  --text-c3--letter-spacing: 0;
+
+  /* Button labels */
+  --text-btn-giant: 20px;       /* Bold */
+  --text-btn-giant--line-height: 26px;
+  --text-btn-giant--font-weight: 700;
+  --text-btn-giant--letter-spacing: 0;
+
+  --text-btn-large: 18px;
+  --text-btn-large--line-height: 22px;
+  --text-btn-large--font-weight: 400;
+  --text-btn-large--letter-spacing: 0;
+
+  --text-btn-medium: 14px;
+  --text-btn-medium--line-height: 20px;
+  --text-btn-medium--font-weight: 400;
+  --text-btn-medium--letter-spacing: 0;
+
+  /* ---------- Brand / Primary palette (per Figma color spec) ---------- */
+  --color-brand-navy: #0B1E8A;         /* Navy */
+  --color-brand-navy-dark: #061459;    /* derived darker */
+  --color-brand-navy-light: #0197FF;   /* aliased to Blue */
 
   --color-brand-blue: #0197FF;
   --color-brand-yellow: #FFC518;
 
   /* Backwards-compat aliases */
-  --color-brand-primary: #081E6A;      /* Navy */
-  --color-brand-primary-dark: #040F35;
+  --color-brand-primary: #0B1E8A;      /* = Navy */
+  --color-brand-primary-dark: #061459;
   --color-brand-primary-light: #EAF2F8;
   --color-brand-accent: #FFC518;       /* Yellow */
   --color-brand-secondary: #FFC518;
 
   /* ---------- Neutral / Surfaces ---------- */
+  --color-white: #FFFFFF;
   --color-bg-page: #EAF2F8;            /* BG */
-  --color-bg-page-2: #F8FCFD;          /* BG2 */
+  --color-bg-page-2: #FBFCFD;          /* BG 2 */
   --color-bg-card: #FFFFFF;
-  --color-bg-hover: #F8FCFD;
+  --color-bg-hover: #FBFCFD;
 
-  /* Gray ramp (PDF) */
+  /* Gray ramp (Figma neutral colors) */
   --color-gray-50: #F9FAFB;
   --color-gray-100: #F3F4F6;
   --color-gray-200: #E5E7EA;
   --color-gray-300: #D1D5DB;
-  --color-gray-400: #9EA3AE;
+  --color-gray-400: #9EA2AE;
   --color-gray-500: #6D717F;
   --color-gray-600: #4D5461;
   --color-gray-700: #394050;
   --color-gray-800: #212936;
   --color-gray-900: #111827;
 
+  /* ---------- Extended scale / Soft ---------- */
+  --color-blue-light: #56CCF2;
+  --color-yellow-hover: #F4D76A;
+  --color-yellow-soft: #FFF4CC;
+
+  /* ---------- Extended scale / Blue scale ---------- */
+  --color-blue-100: #EBF6FF;
+  --color-blue-300: #56CCF2;
+  --color-blue-500: #2D9CDB;
+  --color-blue-700: #1D4ED8;
+  --color-blue-900: #0B1E8A;
+
   /* ---------- Borders ---------- */
   --color-border-default: #E5E7EA;     /* Gray-200 */
   --color-border-strong: #D1D5DB;      /* Gray-300 */
-  --color-border-focus: #081E6A;       /* Navy */
+  --color-border-focus: #0B1E8A;       /* Navy */
 
   /* ---------- Text ---------- */
   --color-text-primary: #111827;       /* Gray-900 */
   --color-text-secondary: #4D5461;     /* Gray-600 */
-  --color-text-muted: #9EA3AE;         /* Gray-400 */
+  --color-text-muted: #9EA2AE;         /* Gray-400 */
   --color-text-link: #0197FF;          /* Blue */
   --color-text-on-dark: #FFFFFF;
 
-  /* ---------- Semantic / Status ---------- */
-  --color-status-success: #19B400;
-  --color-status-success-bg: #E8F8E4;
-  --color-status-warning: #FF980A;
-  --color-status-warning-bg: #FFF1DC;
+  /* ---------- Semantic / Status (per Figma color spec) ---------- */
+  --color-status-success: #27AE60;
+  --color-status-success-bg: #E8F6EE;
+  --color-status-warning: #F2994A;
+  --color-status-warning-bg: #FDF1E6;
   --color-status-danger: #FF0000;
   --color-status-danger-bg: #FFE5E5;
   --color-status-info: #0197FF;
-  --color-status-info-bg: #EAF2F8;
+  --color-status-info-bg: #EBF6FF;     /* Blue-100 */
 
-  /* ---------- Member tier (kept) ---------- */
+  /* ---------- Member tier ---------- */
   --color-tier-prospect-bg: #F3F4F6;
   --color-tier-prospect-text: #4D5461;
   --color-tier-member-bg: #0197FF;
@@ -112,7 +216,7 @@
   --color-tier-gold-text: #212936;
   --color-tier-platinum-bg: #394050;
   --color-tier-platinum-text: #FFFFFF;
-  --color-tier-diamond-bg: #081E6A;
+  --color-tier-diamond-bg: #0B1E8A;
   --color-tier-diamond-text: #FFFFFF;
 
   /* ---------- shadcn bridge (so existing components still work) ---------- */
@@ -158,9 +262,9 @@
   --radius-full: 9999px;
 
   /* ---------- Shadows (soft, enterprise) ---------- */
-  --shadow-card: 0 1px 2px rgba(8, 30, 106, 0.04), 0 1px 3px rgba(8, 30, 106, 0.06);
-  --shadow-elev: 0 4px 12px rgba(8, 30, 106, 0.08);
-  --shadow-focus: 0 0 0 3px rgba(8, 30, 106, 0.18);
+  --shadow-card: 0 1px 2px rgba(11, 30, 138, 0.04), 0 1px 3px rgba(11, 30, 138, 0.06);
+  --shadow-elev: 0 4px 12px rgba(11, 30, 138, 0.08);
+  --shadow-focus: 0 0 0 3px rgba(11, 30, 138, 0.18);
 
   /* ---------- Motion ---------- */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
@@ -180,11 +284,24 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-family: "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* Default body = B3 (20/26 Regular) per Figma type scale */
+    font-size: var(--text-b3);
+    line-height: var(--text-b3--line-height);
+    font-weight: var(--text-b3--font-weight);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
+
+  /* Native heading defaults from type scale */
+  h1 { font-size: var(--text-h1); line-height: var(--text-h1--line-height); font-weight: 700; letter-spacing: 0; }
+  h2 { font-size: var(--text-h2); line-height: var(--text-h2--line-height); font-weight: 700; letter-spacing: 0; }
+  h3 { font-size: var(--text-h3); line-height: var(--text-h3--line-height); font-weight: 700; letter-spacing: 0; }
+  h4 { font-size: var(--text-h4); line-height: var(--text-h4--line-height); font-weight: 700; letter-spacing: 0; }
+  h5 { font-size: var(--text-h5); line-height: var(--text-h5--line-height); font-weight: 700; letter-spacing: 0; }
+  h6 { font-size: var(--text-s1); line-height: var(--text-s1--line-height); font-weight: 700; letter-spacing: 0; }
+  small { font-size: var(--text-c2); line-height: var(--text-c2--line-height); }
 
   /* Custom scrollbar — uses neutral grays */
   ::-webkit-scrollbar {
@@ -205,4 +322,31 @@
     scrollbar-width: thin;
     scrollbar-color: #D1D5DB transparent;
   }
+}
+
+/* ---------- Type-scale classes ---------- */
+/* Use these everywhere instead of raw text-xs/sm/base — they encode the
+   complete scale (size + line-height + weight) per Figma type system. */
+@layer utilities {
+  .text-h1 { font-size: var(--text-h1); line-height: var(--text-h1--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-h2 { font-size: var(--text-h2); line-height: var(--text-h2--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-h3 { font-size: var(--text-h3); line-height: var(--text-h3--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-h4 { font-size: var(--text-h4); line-height: var(--text-h4--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-h5 { font-size: var(--text-h5); line-height: var(--text-h5--line-height); font-weight: 700; letter-spacing: 0; }
+
+  .text-s1 { font-size: var(--text-s1); line-height: var(--text-s1--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-s2 { font-size: var(--text-s2); line-height: var(--text-s2--line-height); font-weight: 700; letter-spacing: 0; }
+
+  .text-b1 { font-size: var(--text-b1); line-height: var(--text-b1--line-height); font-weight: 400; letter-spacing: 0; }
+  .text-b2 { font-size: var(--text-b2); line-height: var(--text-b2--line-height); font-weight: 500; letter-spacing: 0; }
+  .text-b3 { font-size: var(--text-b3); line-height: var(--text-b3--line-height); font-weight: 400; letter-spacing: 0; }
+  .text-b4 { font-size: var(--text-b4); line-height: var(--text-b4--line-height); font-weight: 500; letter-spacing: 0; }
+
+  .text-c1 { font-size: var(--text-c1); line-height: var(--text-c1--line-height); font-weight: 400; letter-spacing: 0; }
+  .text-c2 { font-size: var(--text-c2); line-height: var(--text-c2--line-height); font-weight: 500; letter-spacing: 0; }
+  .text-c3 { font-size: var(--text-c3); line-height: var(--text-c3--line-height); font-weight: 500; letter-spacing: 0; }
+
+  .text-btn-giant  { font-size: var(--text-btn-giant);  line-height: var(--text-btn-giant--line-height);  font-weight: 700; letter-spacing: 0; }
+  .text-btn-large  { font-size: var(--text-btn-large);  line-height: var(--text-btn-large--line-height);  font-weight: 400; letter-spacing: 0; }
+  .text-btn-medium { font-size: var(--text-btn-medium); line-height: var(--text-btn-medium--line-height); font-weight: 400; letter-spacing: 0; }
 }
