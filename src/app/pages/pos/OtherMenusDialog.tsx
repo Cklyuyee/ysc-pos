@@ -37,12 +37,12 @@ export default function OtherMenusDialog({ open, onClose, onSelectDeliveryDoc, o
       <div className="relative bg-white rounded-[20px] shadow-2xl w-full max-w-[680px] mx-4 overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-7 py-5 shrink-0" style={{ backgroundColor: NAVY }}>
-          <span className="text-h3 font-bold text-white">เมนูอื่นๆ</span>
+        <div className="flex items-center justify-between px-6 py-3 shrink-0" style={{ backgroundColor: NAVY }}>
+          <span className="text-h5 font-bold text-white">เมนูอื่นๆ</span>
           <button
             type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition"
+            className="w-9 h-9 rounded-full hover:bg-white/15 flex items-center justify-center transition"
           >
             <X className="w-5 h-5 text-white" />
           </button>
@@ -55,7 +55,7 @@ export default function OtherMenusDialog({ open, onClose, onSelectDeliveryDoc, o
               key={m.title}
               type="button"
               onClick={m.onClick}
-              className="w-full text-left rounded-[16px] border border-gray-200 bg-white p-5 flex items-center gap-5 transition hover:bg-gray-50 hover:border-gray-300 active:scale-[0.99] shadow-sm"
+              className="w-full text-left rounded-[16px] border border-gray-200 bg-white p-5 flex items-center gap-5 transition hover:bg-gray-50 hover:border-gray-300 active:scale-[0.99]"
             >
               {/* Icon */}
               <div
@@ -67,8 +67,8 @@ export default function OtherMenusDialog({ open, onClose, onSelectDeliveryDoc, o
 
               {/* Text */}
               <div className="flex-1 min-w-0">
-                <div className="text-h4 font-bold text-text-primary mb-1">{m.title}</div>
-                <div className="text-b2 text-text-muted leading-relaxed">{m.desc}</div>
+                <div className="text-h5 font-bold text-text-primary mb-1">{m.title}</div>
+                <div className="text-b4 text-text-muted leading-relaxed">{m.desc}</div>
               </div>
 
               <ChevronRight className="w-6 h-6 text-gray-400 shrink-0" />
@@ -77,11 +77,11 @@ export default function OtherMenusDialog({ open, onClose, onSelectDeliveryDoc, o
         </div>
 
         {/* Footer */}
-        <div className="px-6 pb-6 pt-1">
+        <div className="px-6 py-4 border-t border-gray-200 bg-bg-page">
           <button
             type="button"
             onClick={onClose}
-            className="w-full h-14 rounded-[14px] bg-gray-100 text-h5 font-bold text-text-secondary hover:bg-gray-200 transition"
+            className="w-full h-12 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-gray-50 transition"
           >
             ยกเลิก
           </button>

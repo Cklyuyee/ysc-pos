@@ -143,10 +143,13 @@ interface Props {
 
 export default function DeliveryDocDialog({ open, onClose }: Props) {
   const [view, setView] = useState<DialogView>('search');
-  const [query, setQuery] = useState('');
+  const [custCode, setCustCode] = useState('');
+  const [custName, setCustName] = useState('');
+  const [docNumber, setDocNumber] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [results, setResults] = useState<DeliveryDoc[]>(MOCK_DOCS);
+  /** null = ยังไม่ได้กดค้นหาเลย; array = กดแล้ว (อาจว่าง) */
+  const [results, setResults] = useState<DeliveryDoc[] | null>(null);
   const [selected, setSelected] = useState<DeliveryDoc | null>(null);
   const [editItems, setEditItems] = useState<DocItem[]>([]);
   const [editNote, setEditNote] = useState('');
@@ -168,16 +171,22 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
 
   // ── search ──
   const handleSearch = () => {
-    const q = query.trim().toLowerCase();
+    const cc = custCode.trim().toLowerCase();
+    const cn = custName.trim().toLowerCase();
+    const dn = docNumber.trim().toLowerCase();
     setResults(
       MOCK_DOCS.filter(d => {
-        const matchQ = !q || d.docNumber.toLowerCase().includes(q) || d.customer.toLowerCase().includes(q);
+        const matchCc = !cc || d.customerId.toLowerCase().includes(cc);
+        const matchCn = !cn || d.customer.toLowerCase().includes(cn);
+        const matchDn = !dn || d.docNumber.toLowerCase().includes(dn);
         const matchFrom = !dateFrom || d.date >= dateFrom;
         const matchTo = !dateTo || d.date <= dateTo;
-        return matchQ && matchFrom && matchTo;
+        return matchCc && matchCn && matchDn && matchFrom && matchTo;
       })
     );
   };
+  const hasFilter = custCode || custName || docNumber || dateFrom || dateTo;
+  const handleReset = () => { setCustCode(''); setCustName(''); setDocNumber(''); setDateFrom(''); setDateTo(''); setResults(null); };
 
   // ── open detail ──
   const openDetail = (doc: DeliveryDoc) => {
@@ -236,14 +245,13 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => setView(view === 'edit' ? 'detail' : 'search')}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition mr-1"
+                className="w-8 h-8 rounded-full hover:bg-white/15 flex items-center justify-center transition"
               >
                 <ChevronLeft className="w-4 h-4 text-white" />
               </button>
             )}
-            <FileSearch className="w-5 h-5 text-white/70" />
-            <span className="text-s1 font-bold text-white">
-              {view === 'search' && 'ค้นหา / พิมพ์ / แก้ไข ใบส่งสินค้า'}
+            <span className="text-h5 font-bold text-white">
+              {view === 'search' && 'ค้นหา/พิมพ์/แก้ไขใบส่งสินค้า'}
               {view === 'detail' && `ใบส่งสินค้า ${selected?.docNumber}`}
               {view === 'edit' && `แก้ไข ${selected?.docNumber}`}
             </span>
@@ -256,8 +264,8 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
               </span>
             )}
           </div>
-          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
-            <X className="w-4 h-4 text-white" />
+          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full hover:bg-white/15 flex items-center justify-center transition">
+            <X className="w-5 h-5 text-white" />
           </button>
         </div>
 
@@ -267,157 +275,171 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
             {/* Filter bar */}
             <div className="px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
               <div className="flex items-end gap-3">
-                {/* Main search */}
+                {/* รหัสลูกค้า */}
                 <div className="flex-1">
-                  <label className="text-c1 text-text-secondary mb-1.5 block">ค้นหา</label>
-                  <div className="flex items-center gap-2 h-11 px-4 bg-white border-2 border-gray-200 rounded-[10px] focus-within:border-sky-400 transition">
+                  <label className="text-c1 text-text-secondary mb-1.5 block">รหัสลูกค้า</label>
+                  <div className="flex items-center gap-2 h-11 px-3 bg-white border-2 border-gray-200 rounded-[10px] focus-within:border-sky-400 transition">
                     <Search className="w-4 h-4 text-gray-400 shrink-0" />
-                    <input
-                      ref={searchRef}
-                      type="text"
-                      value={query}
-                      onChange={e => setQuery(e.target.value)}
+                    <input ref={searchRef} type="text" value={custCode}
+                      onChange={e => setCustCode(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                      placeholder="เลขที่ใบ หรือ ชื่อลูกค้า"
-                      className="flex-1 text-b2 outline-none bg-transparent placeholder:text-gray-400"
-                    />
+                      placeholder="เช่น C-0042"
+                      className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400" />
                   </div>
                 </div>
-                {/* Date from */}
-                <div>
-                  <label className="text-c1 text-text-secondary mb-1.5 block">วันที่ (จาก)</label>
-                  <input
-                    type="date"
-                    value={dateFrom}
-                    onChange={e => setDateFrom(e.target.value)}
-                    className="h-11 px-3 border-2 border-gray-200 rounded-[10px] text-b2 outline-none focus:border-sky-400 transition bg-white"
-                  />
+                {/* ชื่อลูกค้า */}
+                <div className="flex-1">
+                  <label className="text-c1 text-text-secondary mb-1.5 block">ชื่อลูกค้า</label>
+                  <div className="flex items-center gap-2 h-11 px-3 bg-white border-2 border-gray-200 rounded-[10px] focus-within:border-sky-400 transition">
+                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                    <input type="text" value={custName}
+                      onChange={e => setCustName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                      placeholder="ชื่อลูกค้า"
+                      className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400" />
+                  </div>
                 </div>
-                {/* Date to */}
-                <div>
-                  <label className="text-c1 text-text-secondary mb-1.5 block">ถึง</label>
-                  <input
-                    type="date"
-                    value={dateTo}
-                    onChange={e => setDateTo(e.target.value)}
-                    className="h-11 px-3 border-2 border-gray-200 rounded-[10px] text-b2 outline-none focus:border-sky-400 transition bg-white"
-                  />
+                {/* เลขที่ใบ */}
+                <div className="flex-1">
+                  <label className="text-c1 text-text-secondary mb-1.5 block">เลขที่ใบส่งสินค้า</label>
+                  <div className="flex items-center gap-2 h-11 px-3 bg-white border-2 border-gray-200 rounded-[10px] focus-within:border-sky-400 transition">
+                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                    <input type="text" value={docNumber}
+                      onChange={e => setDocNumber(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                      placeholder="เช่น DLV-6804-00123"
+                      className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400" />
+                  </div>
                 </div>
-                {/* Search btn */}
-                <button
-                  type="button"
-                  onClick={handleSearch}
-                  className="h-11 px-6 rounded-[10px] text-h5 font-bold transition hover:brightness-95 shrink-0"
-                  style={{ backgroundColor: YELLOW, color: NAVY }}
-                >
-                  ค้นหา
+                {/* วันที่ */}
+                <div className="flex-1">
+                  <label className="text-c1 text-text-secondary mb-1.5 block">วันที่บิล — วันสิ้นสุดบิล</label>
+                  <div className="flex items-center gap-1.5 h-11 px-3 bg-white border-2 border-gray-200 rounded-[10px] focus-within:border-sky-400 transition">
+                    <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                      className="flex-1 text-b3 outline-none bg-transparent min-w-0" />
+                    <span className="text-gray-400 shrink-0">—</span>
+                    <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                      className="flex-1 text-b3 outline-none bg-transparent min-w-0" />
+                  </div>
+                </div>
+                {/* ค้นหา */}
+                <button type="button" onClick={handleSearch}
+                  className="h-11 px-6 rounded-[10px] text-h5 font-bold transition hover:brightness-95 shrink-0 flex items-center gap-2"
+                  style={{ backgroundColor: YELLOW, color: NAVY }}>
+                  <Search className="w-4 h-4" />ค้นหา
                 </button>
-                {/* Reset */}
-                {(query || dateFrom || dateTo) && (
-                  <button
-                    type="button"
-                    onClick={() => { setQuery(''); setDateFrom(''); setDateTo(''); setResults(MOCK_DOCS); }}
-                    className="h-11 px-4 rounded-[10px] border border-gray-300 text-c1 text-text-secondary hover:bg-gray-50 transition shrink-0"
-                  >
-                    ล้าง
-                  </button>
+              </div>
+            </div>
+
+            {/* Results area */}
+            <div className="flex-1 overflow-y-auto px-6 pt-5 pb-2">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-s2 font-bold text-text-primary">ผลการค้นหา</span>
+                {results !== null && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-c1 text-text-muted">พบ {results.length} รายการ</span>
+                    {hasFilter && (
+                      <button type="button" onClick={handleReset}
+                        className="text-c1 text-sky-500 hover:underline">ล้างการค้นหา</button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-[14px] border border-gray-200 overflow-hidden">
+                {/* Initial empty state */}
+                {results === null && (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3 bg-gray-50">
+                    <Search className="w-12 h-12 text-gray-300" />
+                    <div className="text-b3 text-text-muted text-center">
+                      กรุณาพิมพ์รหัส ชื่อลูกค้า เลขที่ใบส่งสินค้า วันที่บิล<br />เพื่อเริ่มการค้นหา
+                    </div>
+                  </div>
+                )}
+
+                {/* No results */}
+                {results !== null && results.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3 bg-gray-50">
+                    <FileSearch className="w-12 h-12 text-gray-300" />
+                    <div className="text-b3 text-text-muted">ไม่พบใบส่งสินค้าที่ตรงกัน</div>
+                  </div>
+                )}
+
+                {/* Results table */}
+                {results !== null && results.length > 0 && (
+                  <table className="w-full">
+                    <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
+                      <tr>
+                        <th className="text-left px-5 py-3 text-c1 text-text-secondary font-semibold">เลขที่ใบ</th>
+                        <th className="text-left px-5 py-3 text-c1 text-text-secondary font-semibold">ชื่อลูกค้า</th>
+                        <th className="text-center px-4 py-3 text-c1 text-text-secondary font-semibold">วันที่</th>
+                        <th className="text-center px-4 py-3 text-c1 text-text-secondary font-semibold">รายการ</th>
+                        <th className="text-right px-5 py-3 text-c1 text-text-secondary font-semibold">ยอดสุทธิ</th>
+                        <th className="text-center px-4 py-3 text-c1 text-text-secondary font-semibold">สถานะ</th>
+                        <th className="px-4 py-3" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.map((doc, i) => (
+                        <tr key={doc.id}
+                          className={`border-b border-gray-100 last:border-b-0 hover:bg-sky-50 cursor-pointer transition-colors ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
+                          onClick={() => openDetail(doc)}>
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-sky-400 shrink-0" />
+                              <span className="text-b2 font-mono font-bold text-text-primary">{doc.docNumber}</span>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <div className="text-b2 text-text-primary">{doc.customer}</div>
+                            <div className="text-c2 text-text-muted">{doc.customerId}</div>
+                          </td>
+                          <td className="px-4 py-3.5 text-center text-b3 text-text-secondary whitespace-nowrap">
+                            {fmtDate(doc.date)}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-c2 text-text-secondary">
+                              <Package className="w-3 h-3" />
+                              {doc.items.length} รายการ
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-right">
+                            <span className="text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
+                              ฿{fmt(docTotal(doc.items))}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <span className="inline-block px-2.5 py-1 rounded-[8px] text-c2 font-bold whitespace-nowrap"
+                              style={{ backgroundColor: STATUS_BG[doc.status], color: STATUS_COLOR[doc.status] }}>
+                              {STATUS_LABEL[doc.status]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-2 justify-end">
+                              <button type="button" title="พิมพ์ใบส่งสินค้า" onClick={() => handlePrint(doc)}
+                                className="w-8 h-8 rounded-[8px] flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-text-primary transition">
+                                <Printer className="w-4 h-4" />
+                              </button>
+                              {doc.status === 'pending' && (
+                                <button type="button" title="แก้ไขรายการ" onClick={() => openEdit(doc)}
+                                  className="w-8 h-8 rounded-[8px] flex items-center justify-center border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-500 transition">
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>
 
-            {/* Results table */}
-            <div className="flex-1 overflow-y-auto">
-              {results.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-text-muted gap-3">
-                  <FileSearch className="w-12 h-12 text-gray-300" />
-                  <div className="text-b2">ไม่พบใบส่งสินค้าที่ตรงกัน</div>
-                </div>
-              ) : (
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
-                    <tr>
-                      <th className="text-left px-5 py-3 text-c1 text-text-secondary font-semibold">เลขที่ใบ</th>
-                      <th className="text-left px-5 py-3 text-c1 text-text-secondary font-semibold">ชื่อลูกค้า</th>
-                      <th className="text-center px-4 py-3 text-c1 text-text-secondary font-semibold">วันที่</th>
-                      <th className="text-center px-4 py-3 text-c1 text-text-secondary font-semibold">รายการ</th>
-                      <th className="text-right px-5 py-3 text-c1 text-text-secondary font-semibold">ยอดสุทธิ</th>
-                      <th className="text-center px-4 py-3 text-c1 text-text-secondary font-semibold">สถานะ</th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((doc, i) => (
-                      <tr
-                        key={doc.id}
-                        className={`border-b border-gray-100 last:border-b-0 hover:bg-sky-50 cursor-pointer transition-colors ${i % 2 === 0 ? '' : 'bg-gray-50/40'}`}
-                        onClick={() => openDetail(doc)}
-                      >
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-sky-400 shrink-0" />
-                            <span className="text-b2 font-mono font-bold text-text-primary">{doc.docNumber}</span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="text-b2 text-text-primary">{doc.customer}</div>
-                          <div className="text-c2 text-text-muted">{doc.customerId}</div>
-                        </td>
-                        <td className="px-4 py-3.5 text-center text-b3 text-text-secondary whitespace-nowrap">
-                          {fmtDate(doc.date)}
-                        </td>
-                        <td className="px-4 py-3.5 text-center">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-c2 text-text-secondary">
-                            <Package className="w-3 h-3" />
-                            {doc.items.length} รายการ
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-right">
-                          <span className="text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
-                            ฿{fmt(docTotal(doc.items))}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 text-center">
-                          <span
-                            className="inline-block px-2.5 py-1 rounded-[8px] text-c2 font-bold whitespace-nowrap"
-                            style={{ backgroundColor: STATUS_BG[doc.status], color: STATUS_COLOR[doc.status] }}
-                          >
-                            {STATUS_LABEL[doc.status]}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center gap-2 justify-end">
-                            <button
-                              type="button"
-                              title="พิมพ์ใบส่งสินค้า"
-                              onClick={() => handlePrint(doc)}
-                              className="w-8 h-8 rounded-[8px] flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-text-primary transition"
-                            >
-                              <Printer className="w-4 h-4" />
-                            </button>
-                            {doc.status === 'pending' && (
-                              <button
-                                type="button"
-                                title="แก้ไขรายการ"
-                                onClick={() => openEdit(doc)}
-                                className="w-8 h-8 rounded-[8px] flex items-center justify-center border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-500 transition"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between shrink-0">
-              <span className="text-c1 text-text-muted">พบ {results.length} รายการ</span>
+            <div className="px-6 py-4 border-t border-gray-200 bg-bg-page shrink-0">
               <button type="button" onClick={onClose}
-                className="h-10 px-5 rounded-[10px] border border-gray-300 text-c1 text-text-secondary hover:bg-gray-50 transition">
+                className="w-full h-11 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-secondary hover:bg-gray-50 transition">
                 ปิด (Esc)
               </button>
             </div>
