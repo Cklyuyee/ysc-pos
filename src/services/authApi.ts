@@ -24,3 +24,9 @@ export const changePassword = (currentPassword: string, newPassword: string) =>
     method: 'POST',
     body: JSON.stringify({ currentPassword, newPassword }),
   })
+
+export const forgotPassword = (email: string, redirectTo?: string) =>
+  apiFetch<void>('/auth/forget-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, redirectTo: redirectTo ?? `${window.location.origin}/reset-password` }),
+  })

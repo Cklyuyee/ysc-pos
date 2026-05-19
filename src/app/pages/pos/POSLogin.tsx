@@ -1,206 +1,353 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { signIn } from '../../../services/authApi';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, MailCheck, RefreshCcw } from 'lucide-react';
+import { signIn, forgotPassword } from '../../../services/authApi';
 
 const NAVY = '#0B1E8A';
 const YELLOW = '#FFC518';
 
+type View = 'login' | 'forgot' | 'sent';
+
 export default function POSLogin() {
   const navigate = useNavigate();
+
+  // ── shared state ──
+  const [view, setView] = useState<View>('login');
+
+  // ── login state ──
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
+  // ── forgot-password state ──
+  const [fpEmail, setFpEmail] = useState('');
+  const [fpLoading, setFpLoading] = useState(false);
+  const [fpError, setFpError] = useState('');
+
+  // ─────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
-      setError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
+      setLoginError('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
       return;
     }
-    setLoading(true);
-    setError('');
+    setLoginLoading(true);
+    setLoginError('');
     try {
       await signIn(email.trim(), password);
       navigate('/');
     } catch (err: unknown) {
       const status = (err as { status?: number }).status;
       if (status === 401 || status === 400) {
-        setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+        setLoginError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
       } else {
-        setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+        setLoginError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
       }
     } finally {
-      setLoading(false);
+      setLoginLoading(false);
     }
   };
 
-  return (
-    <div className="h-screen w-screen flex bg-[#EAF2F8]">
-      {/* LEFT — hero panel with BG image */}
-      <div
-        className="relative w-[48%] shrink-0 overflow-hidden rounded-[28px] m-5"
-        style={{
-          backgroundColor: NAVY,
-          backgroundImage: "url('/bg-login.png')",
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
-      >
+  const openForgot = () => {
+    setFpEmail(email); // pre-fill from login field
+    setFpError('');
+    setView('forgot');
+  };
 
-        <div className="relative h-full flex flex-col p-10">
-          {/* Brand */}
-          <div className="flex items-center gap-4">
-            <div className="w-[68px] h-[68px] rounded-[12px] bg-white flex items-center justify-center p-2 shadow-[var(--shadow-elev)] shrink-0">
-              <img
-                src="/logo-ysc.png"
-                alt="YSC"
-                className="w-full h-full object-contain"
-                onError={e => {
-                  const img = e.target as HTMLImageElement;
-                  img.style.display = 'none';
-                  img.parentElement!.innerHTML = `
-                    <div class="flex flex-col items-center justify-center leading-none gap-0.5">
-                      <span class="text-[11px] font-bold tracking-[0.05em]" style="color:${NAVY}">YONG</span>
-                      <div class="w-7 h-7 rounded-full flex items-center justify-center" style="background:${YELLOW}">
-                        <span class="text-c3 font-black" style="color:${NAVY}">Y</span>
-                      </div>
-                      <span class="text-[10px] font-bold tracking-[0.05em]" style="color:${NAVY}">CHAROEN</span>
-                    </div>`;
-                }}
-              />
-            </div>
-            <span
-              className="text-h1 tracking-tight"
-              style={{ color: YELLOW }}
-            >
-              YSC POS
-            </span>
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fpEmail.trim()) {
+      setFpError('กรุณากรอกอีเมลของคุณ');
+      return;
+    }
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRe.test(fpEmail.trim())) {
+      setFpError('รูปแบบอีเมลไม่ถูกต้อง');
+      return;
+    }
+    setFpLoading(true);
+    setFpError('');
+    try {
+      await forgotPassword(fpEmail.trim());
+      setView('sent');
+    } catch {
+      // Show success anyway — don't reveal whether email exists
+      setView('sent');
+    } finally {
+      setFpLoading(false);
+    }
+  };
+
+  // ─────────────────────────────────────────
+  const heroPanel = (
+    <div
+      className="relative w-[48%] shrink-0 overflow-hidden rounded-[28px] m-5"
+      style={{
+        backgroundColor: NAVY,
+        backgroundImage: "url('/bg-login.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      <div className="relative h-full flex flex-col p-10">
+        {/* Brand */}
+        <div className="flex items-center gap-4">
+          <div className="w-[68px] h-[68px] rounded-[12px] bg-white flex items-center justify-center p-2 shadow-[var(--shadow-elev)] shrink-0">
+            <img
+              src="/logo-ysc.png"
+              alt="YSC"
+              className="w-full h-full object-contain"
+              onError={e => {
+                const img = e.target as HTMLImageElement;
+                img.style.display = 'none';
+                img.parentElement!.innerHTML = `
+                  <div class="flex flex-col items-center justify-center leading-none gap-0.5">
+                    <span class="text-[11px] font-bold tracking-[0.05em]" style="color:${NAVY}">YONG</span>
+                    <div class="w-7 h-7 rounded-full flex items-center justify-center" style="background:${YELLOW}">
+                      <span class="text-c3 font-black" style="color:${NAVY}">Y</span>
+                    </div>
+                    <span class="text-[10px] font-bold tracking-[0.05em]" style="color:${NAVY}">CHAROEN</span>
+                  </div>`;
+              }}
+            />
           </div>
+          <span className="text-h1 tracking-tight" style={{ color: YELLOW }}>
+            YSC POS
+          </span>
+        </div>
 
-          {/* Headline at bottom */}
-          <div className="mt-auto">
-            <h1 className="text-[62px] font-extrabold text-white leading-[1.1] tracking-tight">
-              เข้าสู่ระบบ<br />จัดการหน้าร้าน
-            </h1>
-            <p className="text-white text-h4 mt-5 leading-relaxed max-w-[640px]">
-              เข้าใช้งานระบบ Smart Terminal เพื่อเริ่มการขาย<br />
-              ตรวจสอบสต็อก และจัดการสมาชิก
-            </p>
+        {/* Headline at bottom */}
+        <div className="mt-auto">
+          <h1 className="text-[62px] font-extrabold text-white leading-[1.1] tracking-tight">
+            เข้าสู่ระบบ<br />จัดการหน้าร้าน
+          </h1>
+          <p className="text-white text-h4 mt-5 leading-relaxed max-w-[640px]">
+            เข้าใช้งานระบบ Smart Terminal เพื่อเริ่มการขาย<br />
+            ตรวจสอบสต็อก และจัดการสมาชิก
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─────────────────────────────────────────
+  // VIEW: login
+  // ─────────────────────────────────────────
+  if (view === 'login') {
+    return (
+      <div className="h-screen w-screen flex bg-[#EAF2F8]">
+        {heroPanel}
+
+        <div className="flex-1 flex items-center justify-center px-8 py-12">
+          <div className="w-full max-w-[500px]">
+            <div className="mb-10">
+              <h2 className="text-h1 tracking-tight whitespace-nowrap" style={{ color: NAVY }}>
+                ยินดีต้อนรับกลับมา
+              </h2>
+              <p className="text-text-secondary text-b2 mt-2">
+                กรุณากรอกข้อมูลเพื่อลงชื่อเข้าใช้
+              </p>
+            </div>
+
+            <form onSubmit={handleLogin} className="flex flex-col gap-5">
+              {/* Email */}
+              <div className="flex flex-col gap-2">
+                <label className="text-h5 text-text-secondary">ชื่อผู้ใช้หรืออีเมล</label>
+                <div className={`flex items-center gap-3 h-[56px] px-5 bg-white border-2 rounded-[12px] transition-colors duration-200 ${loginError && !email ? 'border-status-danger/60' : 'border-gray-200 focus-within:border-brand-yellow'}`}>
+                  <Mail className="w-5 h-5 text-gray-400 shrink-0" />
+                  <input
+                    type="text"
+                    value={email}
+                    onChange={e => { setEmail(e.target.value); setLoginError(''); }}
+                    placeholder="กรอกชื่อผู้ใช้หรืออีเมล"
+                    className="flex-1 text-b2 text-text-primary placeholder:text-gray-400 outline-none bg-transparent"
+                    autoComplete="username"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div className="flex flex-col gap-2">
+                <label className="text-h5 text-text-secondary">รหัสผ่าน</label>
+                <div className={`flex items-center gap-3 h-[56px] px-5 bg-white border-2 rounded-[12px] transition-colors duration-200 ${loginError && !password ? 'border-status-danger/60' : 'border-gray-200 focus-within:border-brand-yellow'}`}>
+                  <Lock className="w-5 h-5 text-gray-400 shrink-0" />
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => { setPassword(e.target.value); setLoginError(''); }}
+                    placeholder="กรอกรหัสผ่าน"
+                    className="flex-1 text-b2 text-text-primary placeholder:text-gray-400 outline-none bg-transparent"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw(v => !v)}
+                    className="text-gray-400 hover:text-text-primary transition-colors duration-200 shrink-0"
+                    aria-label={showPw ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                  >
+                    {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {loginError && <p className="text-status-danger text-c3 -mt-1">{loginError}</p>}
+
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="flex items-center justify-center gap-2 h-[56px] w-full rounded-[12px] text-h5 transition-[background-color,box-shadow,transform] duration-200 hover:brightness-95 active:scale-[0.99] disabled:opacity-60 shadow-[var(--shadow-card)]"
+                style={{ backgroundColor: YELLOW, color: NAVY }}
+              >
+                {loginLoading
+                  ? <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  : <><span>เข้าสู่ระบบ</span><ArrowRight className="w-5 h-5" /></>}
+              </button>
+            </form>
+
+            <div className="flex items-center justify-between mt-6">
+              <span className="text-b3 text-text-muted">เฉพาะบุคลากรที่ได้รับอนุญาตเท่านั้น</span>
+              <button type="button" onClick={openForgot} className="text-b3 text-brand-blue hover:underline">
+                ลืมรหัสผ่าน?
+              </button>
+            </div>
           </div>
         </div>
       </div>
+    );
+  }
 
-      {/* RIGHT — login form */}
+  // ─────────────────────────────────────────
+  // VIEW: forgot — enter email
+  // ─────────────────────────────────────────
+  if (view === 'forgot') {
+    return (
+      <div className="h-screen w-screen flex bg-[#EAF2F8]">
+        {heroPanel}
+
+        <div className="flex-1 flex items-center justify-center px-8 py-12">
+          <div className="w-full max-w-[500px]">
+            {/* Back */}
+            <button
+              type="button"
+              onClick={() => setView('login')}
+              className="flex items-center gap-2 text-b3 text-text-secondary hover:text-text-primary transition-colors mb-10"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              กลับสู่หน้าเข้าสู่ระบบ
+            </button>
+
+            {/* Icon + heading */}
+            <div className="mb-10">
+              <div
+                className="w-14 h-14 rounded-[14px] flex items-center justify-center mb-6"
+                style={{ backgroundColor: `${NAVY}18` }}
+              >
+                <Mail className="w-7 h-7" style={{ color: NAVY }} />
+              </div>
+              <h2 className="text-h1 tracking-tight" style={{ color: NAVY }}>
+                รีเซ็ตรหัสผ่าน
+              </h2>
+              <p className="text-text-secondary text-b2 mt-2 leading-relaxed">
+                กรอกอีเมลที่ผูกกับบัญชีของคุณ<br />เราจะส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ให้
+              </p>
+            </div>
+
+            <form onSubmit={handleForgot} className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <label className="text-h5 text-text-secondary">อีเมล</label>
+                <div className={`flex items-center gap-3 h-[56px] px-5 bg-white border-2 rounded-[12px] transition-colors duration-200 ${fpError ? 'border-status-danger/60' : 'border-gray-200 focus-within:border-brand-yellow'}`}>
+                  <Mail className="w-5 h-5 text-gray-400 shrink-0" />
+                  <input
+                    type="email"
+                    value={fpEmail}
+                    onChange={e => { setFpEmail(e.target.value); setFpError(''); }}
+                    placeholder="กรอกอีเมลของคุณ"
+                    className="flex-1 text-b2 text-text-primary placeholder:text-gray-400 outline-none bg-transparent"
+                    autoComplete="email"
+                    autoFocus
+                  />
+                </div>
+                {fpError && <p className="text-status-danger text-c3">{fpError}</p>}
+              </div>
+
+              <button
+                type="submit"
+                disabled={fpLoading}
+                className="flex items-center justify-center gap-2 h-[56px] w-full rounded-[12px] text-h5 transition-[background-color,box-shadow,transform] duration-200 hover:brightness-95 active:scale-[0.99] disabled:opacity-60 shadow-[var(--shadow-card)]"
+                style={{ backgroundColor: YELLOW, color: NAVY }}
+              >
+                {fpLoading
+                  ? <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  : <><span>ส่งลิงก์รีเซ็ตรหัสผ่าน</span><ArrowRight className="w-5 h-5" /></>}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // VIEW: sent — confirmation
+  // ─────────────────────────────────────────
+  return (
+    <div className="h-screen w-screen flex bg-[#EAF2F8]">
+      {heroPanel}
+
       <div className="flex-1 flex items-center justify-center px-8 py-12">
         <div className="w-full max-w-[500px]">
-          <div className="mb-10">
-            <h2
-              className="text-h1 tracking-tight whitespace-nowrap"
-              style={{ color: NAVY }}
-            >
-              ยินดีต้อนรับกลับมา
+          {/* Success icon */}
+          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-8 mx-auto">
+            <MailCheck className="w-8 h-8 text-green-600" />
+          </div>
+
+          <div className="text-center mb-8">
+            <h2 className="text-h1 tracking-tight" style={{ color: NAVY }}>
+              ตรวจสอบอีเมลของคุณ
             </h2>
-            <p className="text-text-secondary text-b2 mt-2">
-              กรุณากรอกข้อมูลเพื่อลงชื่อเข้าใช้
+            <p className="text-text-secondary text-b2 mt-3 leading-relaxed">
+              เราส่งลิงก์รีเซ็ตรหัสผ่านไปที่
+            </p>
+            <p className="text-h5 font-bold mt-1" style={{ color: NAVY }}>
+              {fpEmail}
+            </p>
+            <p className="text-text-muted text-c1 mt-3">
+              ลิงก์จะหมดอายุภายใน 15 นาที — กรุณาตรวจสอบกล่อง Spam ด้วย
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="flex flex-col gap-5">
-            {/* Email field */}
-            <div className="flex flex-col gap-2">
-              <label className="text-h5 text-text-secondary">
-                ชื่อผู้ใช้หรืออีเมล
-              </label>
-              <div
-                className={`flex items-center gap-3 h-[56px] px-5 bg-white border-2 rounded-[12px] transition-colors duration-200 ${
-                  error && !email
-                    ? 'border-status-danger/60'
-                    : 'border-gray-200 focus-within:border-brand-yellow'
-                }`}
-              >
-                <Mail className="w-5 h-5 text-gray-400 shrink-0" />
-                <input
-                  type="text"
-                  value={email}
-                  onChange={e => {
-                    setEmail(e.target.value);
-                    setError('');
-                  }}
-                  placeholder="กรอกชื่อผู้ใช้หรืออีเมล"
-                  className="flex-1 text-b2 text-text-primary placeholder:text-gray-400 outline-none bg-transparent"
-                  autoComplete="username"
-                  autoFocus
-                />
-              </div>
-            </div>
+          {/* Info box */}
+          <div className="rounded-[14px] bg-sky-50 border border-sky-200 p-4 mb-8 flex items-start gap-3">
+            <MailCheck className="w-5 h-5 text-sky-500 shrink-0 mt-0.5" />
+            <p className="text-c1 text-sky-800 leading-relaxed">
+              หากไม่ได้รับอีเมลภายใน 5 นาที ให้กดปุ่ม "ส่งอีกครั้ง" หรือติดต่อผู้ดูแลระบบ
+            </p>
+          </div>
 
-            {/* Password field */}
-            <div className="flex flex-col gap-2">
-              <label className="text-h5 text-text-secondary">
-                รหัสผ่าน
-              </label>
-              <div
-                className={`flex items-center gap-3 h-[56px] px-5 bg-white border-2 rounded-[12px] transition-colors duration-200 ${
-                  error && !password
-                    ? 'border-status-danger/60'
-                    : 'border-gray-200 focus-within:border-brand-yellow'
-                }`}
-              >
-                <Lock className="w-5 h-5 text-gray-400 shrink-0" />
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => {
-                    setPassword(e.target.value);
-                    setError('');
-                  }}
-                  placeholder="กรอกรหัสผ่าน"
-                  className="flex-1 text-b2 text-text-primary placeholder:text-gray-400 outline-none bg-transparent"
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw(v => !v)}
-                  className="text-gray-400 hover:text-text-primary transition-colors duration-200 shrink-0"
-                  aria-label={showPw ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
-                >
-                  {showPw ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-status-danger text-c3 -mt-1">{error}</p>
-            )}
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex items-center justify-center gap-2 h-[56px] w-full rounded-[12px] text-h5 transition-[background-color,box-shadow,transform] duration-200 hover:brightness-95 active:scale-[0.99] disabled:opacity-60 shadow-[var(--shadow-card)]"
-              style={{ backgroundColor: YELLOW, color: NAVY }}
-            >
-              {loading ? (
-                <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>เข้าสู่ระบบ <ArrowRight className="w-5 h-5" /></>
-              )}
-            </button>
-          </form>
-
-          <div className="flex items-center justify-between mt-6">
-            <span className="text-b3 text-text-muted">
-              เฉพาะบุคลากรที่ได้รับอนุญาตเท่านั้น
-            </span>
+          <div className="flex flex-col gap-3">
+            {/* Resend */}
             <button
               type="button"
-              className="text-b3 text-brand-blue hover:underline"
+              onClick={() => { setFpError(''); setView('forgot'); }}
+              className="flex items-center justify-center gap-2 h-[56px] w-full rounded-[12px] text-h5 transition duration-200 hover:brightness-95 active:scale-[0.99] shadow-[var(--shadow-card)]"
+              style={{ backgroundColor: YELLOW, color: NAVY }}
             >
-              ลืมรหัสผ่าน?
+              <RefreshCcw className="w-5 h-5" />
+              ส่งลิงก์อีกครั้ง
+            </button>
+
+            {/* Back to login */}
+            <button
+              type="button"
+              onClick={() => setView('login')}
+              className="flex items-center justify-center gap-2 h-[56px] w-full rounded-[12px] text-h5 border-2 border-gray-300 bg-white text-text-primary transition hover:bg-bg-page-2"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              กลับสู่หน้าเข้าสู่ระบบ
             </button>
           </div>
         </div>

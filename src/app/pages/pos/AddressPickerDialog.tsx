@@ -92,13 +92,16 @@ interface Props {
   onConfirm: (addressId: string) => void;
   /** Called when the user submits the "เพิ่มที่อยู่ใหม่" form. */
   onAddAddress?: (addr: Address) => void;
+  /** Called when the user clicks the pin icon to mark an address as default. */
+  onSetDefault?: (addressId: string) => void;
   customerName: string;
   customerPhone?: string;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export function AddressPickerDialog({
-  open, onClose, addresses, selectedId, onConfirm, onAddAddress, customerName, customerPhone,
+  open, onClose, addresses, selectedId, onConfirm, onAddAddress, onSetDefault,
+  customerName, customerPhone,
 }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(selectedId);
   const [mode, setMode] = useState<'list' | 'form'>('list');
@@ -213,7 +216,7 @@ export function AddressPickerDialog({
               <div className="flex flex-col gap-1.5 shrink-0">
                 {!addr.isDefault && (
                   <button
-                    onClick={e => e.stopPropagation()}
+                    onClick={e => { e.stopPropagation(); onSetDefault?.(addr.id); }}
                     title="ตั้งเป็นที่อยู่หลัก"
                     className="w-9 h-9 flex items-center justify-center rounded-[10px] border border-gray-200 bg-white hover:bg-sky-50 hover:border-sky-300 transition"
                   >

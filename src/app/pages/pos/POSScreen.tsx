@@ -7,6 +7,7 @@ import {
   RefreshCw, Pause, Inbox, Ban, LayoutGrid, Crown, User, Package, X,
   MapPin, Warehouse, Eye, Check, Phone, Box, ChevronDown, ChevronUp,
   ShoppingCart, Pencil, Hourglass, Clock, CheckCircle2, Trophy, Ticket,
+  BadgeCheck, FileText, Calendar, Save, Printer,
 } from 'lucide-react';
 import type { LocationSlot } from '../../../services/productsApi';
 import { DISPLAY_CHANNEL, type DisplayMessage } from '../../../services/customerDisplayChannel';
@@ -418,17 +419,17 @@ function CustomerCard({ customer, onClear: _onClear, cartTotal = 0, onApproveCre
               <div className="text-b4 text-text-secondary mb-3">วงเงินเครดิต</div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="rounded-[12px] bg-bg-page-2 px-3 py-3 text-center">
-                  <div className="text-c1 text-text-muted">วงเงินทั้งหมด</div>
+                  <div className="text-c1 text-text-muted">วงเงินเครดิตทั้งหมด</div>
                   <div className="text-s1 text-brand-navy tabular-nums mt-1">{fmtBath(credit)}</div>
                 </div>
                 <div className="rounded-[12px] bg-bg-page-2 px-3 py-3 text-center">
-                  <div className="text-c1 text-text-muted">ใช้ไปแล้ว</div>
+                  <div className="text-c1 text-text-muted">วงเงินเครดิตที่ใช้</div>
                   <div className="text-s1 tabular-nums mt-1" style={{ color: used > 0 ? '#DC2626' : undefined }}>
                     {fmtBath(used)}
                   </div>
                 </div>
                 <div className="rounded-[12px] px-3 py-3 text-center" style={{ backgroundColor: remaining > 0 ? '#F0FDF4' : remaining < 0 ? '#FEF2F2' : '#F9FAFB' }}>
-                  <div className="text-c1 text-text-muted">คงเหลือ</div>
+                  <div className="text-c1 text-text-muted">วงเงินเครดิตคงเหลือ</div>
                   <div
                     className="text-s1 tabular-nums mt-1 font-bold"
                     style={{ color: remaining > 0 ? '#16A34A' : remaining < 0 ? '#DC2626' : '#6B7280' }}
@@ -650,6 +651,12 @@ export default function POSScreen() {
   const [showFulfillmentConfirm, setShowFulfillmentConfirm] = useState(false);
   const [pendingBulkFulfillment, setPendingBulkFulfillment] = useState<'pickup' | 'delivery' | null>(null);
   const [showFulfillmentSummary, setShowFulfillmentSummary] = useState(false);
+  /** true = opened from F11 path (show full bill summary + footer); false = opened from "ดูเพิ่มเติม" (peek, no totals/footer) */
+  const [showFulfillmentSummaryFull, setShowFulfillmentSummaryFull] = useState(false);
+  /** Single intercept popup before final bill summary (covers unscanned gifts + near-promo). */
+  const [showBillIntercept, setShowBillIntercept] = useState(false);
+  /** Final "Order placed" success popup shown after the cashier confirms the bill. */
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
@@ -692,11 +699,14 @@ export default function POSScreen() {
   const [showAddressDialog, setShowAddressDialog] = useState(false)
   /** Addresses added in this session (not yet persisted to backend). Reset when customer changes. */
   const [sessionAddresses, setSessionAddresses] = useState<Address[]>([])
+  /** Optional in-session override of which address is the default. */
+  const [sessionDefaultAddressId, setSessionDefaultAddressId] = useState<string | null>(null)
   const customerIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (customerIdRef.current !== (customer?.id ?? null)) {
       customerIdRef.current = customer?.id ?? null
       setSessionAddresses([])
+      setSessionDefaultAddressId(null)
     }
   }, [customer])
   // ─── Coupons ──────────────────────────────────────────────────────────────
@@ -1238,8 +1248,13 @@ export default function POSScreen() {
           return [{ id: 'default', type: 'shipping' as const, label: 'ที่อยู่หลัก', address: addr, district: '', province: '', postalCode: '', isDefault: true }]
         })()
       : from
-    return [...base, ...sessionAddresses]
-  }, [customer, sessionAddresses])
+    const combined = [...base, ...sessionAddresses]
+    // Apply session-default override (cashier clicked the pin icon)
+    if (sessionDefaultAddressId) {
+      return combined.map(a => ({ ...a, isDefault: a.id === sessionDefaultAddressId }))
+    }
+    return combined
+  }, [customer, sessionAddresses, sessionDefaultAddressId])
 
   const selectedAddress = deliveryAddresses.find(a => a.id === selectedAddressId) ?? deliveryAddresses[0]
 
@@ -1505,6 +1520,7 @@ export default function POSScreen() {
           setSessionAddresses(prev => [...prev, addr]);
           setSelectedAddressId(addr.id);
         }}
+        onSetDefault={id => setSessionDefaultAddressId(id)}
         customerName={customer?.name ?? ''}
         customerPhone={customer?.phone}
       />
@@ -1578,7 +1594,7 @@ export default function POSScreen() {
       {/* ── Fulfillment summary dialog ── */}
       <FulfillmentSummaryDialog
         open={showFulfillmentSummary}
-        onClose={() => setShowFulfillmentSummary(false)}
+        onClose={() => { setShowFulfillmentSummary(false); setShowFulfillmentSummaryFull(false); }}
         cartItems={cartItems}
         fulfillmentMap={fulfillmentMap}
         productMap={productMap}
@@ -1594,7 +1610,351 @@ export default function POSScreen() {
         redeemedRewards={mockRedeemedRewards.map(r => ({
           id: r.id, name: r.name, qty: r.qty, unit: r.unit, image: r.image,
         } as SummaryFreeItem))}
+        shipping={selectedAddress ? {
+          contactName: selectedAddress.contactName ?? selectedAddress.branchName ?? customer?.name,
+          phone: selectedAddress.phone ?? customer?.phone,
+          address: [
+            selectedAddress.address,
+            selectedAddress.district,
+            selectedAddress.province,
+            selectedAddress.postalCode,
+          ].filter(Boolean).join(' '),
+          courier: selectedCourier,
+        } : undefined}
+        packaging={packaging.map(p => ({ id: p.id, name: p.name, qty: p.qty }))}
+        {...(showFulfillmentSummaryFull ? {
+          totals: {
+            subtotalCount: cartItems.length,
+            subtotal: totals.subtotal,
+            freeItemsCount:
+              mockBuyGetItems.filter(i => claimedBuyGetSkus.has(i.sku)).length +
+              mockOrderGifts.filter(g => totals.grand >= g.threshold).length,
+            rewardsCount: mockRedeemedRewards.length,
+            packagingCost,
+            discountAmount: totalDiscount,
+            discountLines: discountBreakdown.length,
+            hasDelivery: deliveryCount > 0,
+            netTotal,
+          },
+          onConfirm: () => {
+            setShowFulfillmentSummary(false);
+            setShowFulfillmentSummaryFull(false);
+            setShowOrderSuccess(true);
+          },
+          onScanMore: () => {
+            setShowFulfillmentSummary(false);
+            setShowFulfillmentSummaryFull(false);
+            barcodeRef.current?.focus();
+          },
+        } : {})}
       />
+
+      {/* ── สรุปบิล intercept: ยังไม่ได้สแกนของแถม + ใกล้ได้รับโปรโมชันเพิ่มเติม ── */}
+      {showBillIntercept && (() => {
+        const unscannedBuyGet = mockBuyGetItems.filter(i => !claimedBuyGetSkus.has(i.sku));
+        const unscannedOrderGifts = mockOrderGifts.filter(g => totals.grand >= g.threshold && !claimedOrderGiftIds.has(g.id));
+        const unscannedBrandPromos = mockBrandPromos.filter(b => b.spend >= b.threshold && !claimedBrandPromoNames.has(b.brand));
+        const totalUnscanned = unscannedBuyGet.length + unscannedOrderGifts.length + unscannedBrandPromos.length;
+        const nearPromos = mockBrandPromos.filter(bp => bp.spend < bp.threshold);
+        const hasUnscanned = totalUnscanned > 0;
+        const hasNearPromo = nearPromos.length > 0;
+        const proceed = () => { setShowBillIntercept(false); setShowFulfillmentSummaryFull(true); setShowFulfillmentSummary(true); };
+        // Title + subtitle written for the cashier — keep it short and direct.
+        const title = hasUnscanned && hasNearPromo
+          ? 'อย่าลืมเช็กของแถมและโปรเพิ่มเติม'
+          : hasNearPromo
+            ? 'ใกล้ได้รับโปรเพิ่มเติม'
+            : 'อย่าลืมสแกนของแถม';
+        const subtitle = hasUnscanned && hasNearPromo
+          ? `บิลนี้มีของแถมที่ยังไม่ได้สแกน ${totalUnscanned} รายการ และโปรอีก ${nearPromos.length} รายการที่ใกล้จะได้รับ`
+          : hasNearPromo
+            ? `เพิ่มสินค้าอีกเล็กน้อยเพื่อรับของแถมหรือส่วนลดเพิ่มเติม (${nearPromos.length} รายการ)`
+            : `กรุณาสแกนของแถมให้ครบก่อนปิดบิล (${totalUnscanned} รายการ)`;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowBillIntercept(false)} />
+            <div className="relative bg-white rounded-[16px] shadow-2xl w-full max-w-[640px] mx-4 flex flex-col overflow-hidden max-h-[92vh]">
+              <div className="px-6 pt-6 pb-4 text-center">
+                <div className="w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                  <AlertTriangle className="w-14 h-14" style={{ color: '#F59E0B' }} strokeWidth={2} />
+                </div>
+                <div className="text-h3 font-bold text-text-primary whitespace-pre-line leading-snug">{title}</div>
+                <div className="text-c1 text-text-secondary mt-2 leading-relaxed">{subtitle}</div>
+              </div>
+              <div className="px-6 pb-4 space-y-2 overflow-y-auto">
+                {/* ── Unscanned: buy-get free ── */}
+                {unscannedBuyGet.map(item => {
+                  const p = productMap.get(item.sku);
+                  const brandHash = (p?.brand ?? item.sku).split('').reduce((s, c) => s + c.charCodeAt(0), 0);
+                  const buyQty = brandHash % 2 === 0 ? 1 : 2;
+                  const giftQty = Math.floor(item.qty / buyQty);
+                  return (
+                    <div key={item.sku} className="rounded-[12px] border border-amber-400 bg-amber-50 p-3 flex items-start gap-3">
+                      <ProductThumb image={p?.image} name={p?.name ?? item.sku} size={48} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-c1 font-bold text-text-primary line-clamp-2 leading-snug flex-1">{p?.name ?? item.sku}</div>
+                          <span className="text-c1 font-bold shrink-0" style={{ color: NAVY }}>{giftQty} {p?.unit ?? 'ชิ้น'}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-2">
+                          <span className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-[8px] bg-red-100 text-red-600 shrink-0">
+                            <Tag className="w-3 h-3" />ซื้อ {buyQty} แถม 1
+                          </span>
+                          <span className="flex items-center gap-1.5 px-3 py-1 rounded-[8px] text-c2 font-bold shrink-0" style={{ backgroundColor: '#FFE3A3', color: '#C36800' }}>
+                            <Hourglass className="w-3.5 h-3.5" />รอสแกน
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* ── Unscanned: order gifts ── */}
+                {unscannedOrderGifts.map(gift => (
+                  <div key={gift.id} className="rounded-[12px] border border-amber-400 bg-amber-50 p-3 flex items-start gap-3">
+                    <ProductThumb image={gift.image} name={gift.name} size={48} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-c1 font-bold text-text-primary line-clamp-2 leading-snug flex-1">{gift.name}</div>
+                        <span className="text-c1 font-bold shrink-0" style={{ color: NAVY }}>{gift.qty} {gift.unit}</span>
+                      </div>
+                      <div className="flex items-center justify-end mt-2">
+                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-[8px] text-c2 font-bold" style={{ backgroundColor: '#FFE3A3', color: '#C36800' }}>
+                          <Hourglass className="w-3.5 h-3.5" />รอสแกน
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {/* ── Unscanned: brand promos (qualified, not claimed) ── */}
+                {unscannedBrandPromos.map(bp => {
+                  const brandCartItem = cartItems.find(ci => productMap.get(ci.sku)?.brand === bp.brand);
+                  const brandImage = brandCartItem ? productMap.get(brandCartItem.sku)?.image : undefined;
+                  const rewardInfo = parseBrandReward(bp.reward);
+                  return (
+                    <div key={bp.brand} className="rounded-[12px] border border-amber-400 bg-amber-50 p-3 flex items-start gap-3">
+                      <ProductThumb image={brandImage} name={bp.brand} size={48} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-c1 font-bold text-text-primary line-clamp-2 leading-snug flex-1">โปรแบรนด์ {bp.brand}</div>
+                          <span className="text-c1 font-bold shrink-0" style={{ color: NAVY }}>{rewardInfo.qty} {rewardInfo.unit}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-2">
+                          <span className="text-c2 text-text-secondary truncate">{bp.reward}</span>
+                          <span className="flex items-center gap-1.5 px-3 py-1 rounded-[8px] text-c2 font-bold shrink-0" style={{ backgroundColor: '#FFE3A3', color: '#C36800' }}>
+                            <Hourglass className="w-3.5 h-3.5" />รอสแกน
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* ── Near-promo brands ── */}
+                {nearPromos.map(bp => {
+                  const pct = Math.min(100, Math.round((bp.spend / bp.threshold) * 100));
+                  const remaining = Math.max(0, bp.threshold - bp.spend);
+                  const brandCartItem = cartItems.find(ci => productMap.get(ci.sku)?.brand === bp.brand);
+                  const brandImage = brandCartItem ? productMap.get(brandCartItem.sku)?.image : undefined;
+                  const rewardInfo = parseBrandReward(bp.reward);
+                  return (
+                    <div key={`near-${bp.brand}`} className="rounded-[12px] border border-amber-400 bg-amber-50 p-3 flex items-start gap-3">
+                      <ProductThumb image={brandImage} name={bp.brand} size={48} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-c1 font-bold text-text-primary leading-snug flex-1">ซื้อเพิ่มอีก {fmt(remaining)}</div>
+                          <span className="text-c1 font-bold shrink-0" style={{ color: NAVY }}>{rewardInfo.qty} {rewardInfo.unit}</span>
+                        </div>
+                        <div className="text-c2 text-text-secondary mt-0.5 truncate">โปรแบรนด์ {bp.brand} รับ{bp.reward}</div>
+                        <div className="mt-2 h-2 rounded-full bg-white overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: '#F59E0B' }} />
+                        </div>
+                        <div className="text-c2 text-text-muted mt-1.5">
+                          ยอดปัจจุบัน {fmt(bp.spend)} /เป้าหมาย {fmt(bp.threshold)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => setShowBillIntercept(false)}
+                  className="flex-1 h-16 rounded-[12px] border border-gray-300 bg-white hover:bg-bg-page-2 transition leading-tight px-2"
+                >
+                  <div className="text-h5 font-bold text-text-primary">ยกเลิก</div>
+                  <div className="text-c2 text-text-secondary mt-0.5">(กลับไปสแกน)</div>
+                </button>
+                <button
+                  onClick={proceed}
+                  className="flex-1 h-16 rounded-[12px] transition hover:brightness-95 leading-tight px-2"
+                  style={{ backgroundColor: YELLOW, color: NAVY }}
+                >
+                  <div className="text-h5 font-bold">ดำเนินการต่อ</div>
+                  <div className="text-c2 mt-0.5" style={{ color: NAVY, opacity: 0.7 }}>(ข้ามการสแกน)</div>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+
+      {/* ── Order success popup (after final bill confirm) ── */}
+      {showOrderSuccess && (() => {
+        const now = new Date();
+        const dd = now.getDate().toString().padStart(2, '0');
+        const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+        const mmShort = thaiMonths[now.getMonth()];
+        const yearTH = now.getFullYear() + 543;
+        const hh = now.getHours().toString().padStart(2, '0');
+        const mn = now.getMinutes().toString().padStart(2, '0');
+        const dateTimeStr = `${dd} ${mmShort} ${yearTH} | ${hh}:${mn}`;
+        const orderNumber = `YSC${(now.getFullYear() % 100).toString().padStart(2, '0')}${(now.getMonth() + 1).toString().padStart(2, '0')}${dd}${hh}${mn}`;
+        const freeItemsCount =
+          mockBuyGetItems.filter(i => claimedBuyGetSkus.has(i.sku)).length +
+          mockOrderGifts.filter(g => totals.grand >= g.threshold).length;
+        const rewardCount = mockRedeemedRewards.length;
+        const fulfillmentLabel = hasMixedFulfillment
+          ? 'แยกรับสินค้า'
+          : deliveryCount > 0
+            ? 'จัดส่งผ่านขนส่ง'
+            : 'รับเองหน้าร้าน';
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowOrderSuccess(false)} />
+            <div className="relative bg-white rounded-[16px] shadow-2xl w-full max-w-[760px] mx-4 flex flex-col overflow-hidden max-h-[92vh]">
+
+              {/* Green hero */}
+              <div className="px-6 py-10 text-center shrink-0" style={{ backgroundColor: '#27AE60' }}>
+                <BadgeCheck className="w-20 h-20 mx-auto mb-3 text-white" strokeWidth={1.8} />
+                <div className="text-h1 font-bold text-white">คำสั่งซื้อสำเร็จ!</div>
+                <div className="text-b2 text-white/90 mt-1.5">ขอบคุณที่ใช้บริการ ยงเจริญ</div>
+              </div>
+
+              {/* Body */}
+              <div className="overflow-y-auto p-6 space-y-4">
+                {/* Order # + Date */}
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-c1 text-text-secondary">
+                      <FileText className="w-4 h-4" />
+                      หมายเลขคำสั่งซื้อ:
+                    </div>
+                    <div className="text-h5 font-bold text-text-primary mt-1">{orderNumber}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center gap-2 justify-end text-c1 text-text-secondary">
+                      <Calendar className="w-4 h-4" />
+                      วันและเวลา
+                    </div>
+                    <div className="text-h5 font-bold text-text-primary mt-1">{dateTimeStr}</div>
+                  </div>
+                </div>
+
+                {/* Sky-50 detail box */}
+                <div className="rounded-[16px] bg-sky-50 border border-sky-200 p-5">
+                  <div className="text-h5 font-bold text-center text-text-primary mb-4">รายละเอียดคำสั่งซื้อ</div>
+                  <div className="space-y-2 text-c1">
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">จำนวนสินค้า</span>
+                      <span className="font-bold text-text-primary">{cartItems.length} รายการ</span>
+                    </div>
+                    {freeItemsCount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary">สินค้าของแถม</span>
+                        <span className="font-bold text-text-primary">{freeItemsCount} รายการ</span>
+                      </div>
+                    )}
+                    {rewardCount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary">ของรางวัลที่แลกไว้</span>
+                        <span className="font-bold text-text-primary">{rewardCount} รายการ</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">การรับสินค้า</span>
+                      <span className="font-bold" style={{ color: '#0197FF' }}>{fulfillmentLabel}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">สถานะคำสั่งซื้อ</span>
+                      <span className="font-bold" style={{ color: '#0197FF' }}>รอชำระเงิน</span>
+                    </div>
+                  </div>
+
+                  {/* Packaging chips */}
+                  {packaging.length > 0 && (
+                    <div className="mt-4 rounded-[12px] bg-white p-3">
+                      <div className="text-c1 text-text-secondary mb-2">บรรจุภัณฑ์ที่ใช้</div>
+                      <div className="flex flex-wrap gap-2">
+                        {packaging.map(p => (
+                          <span key={p.id} className="inline-flex items-center px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-c2 text-text-primary">
+                            {p.name} x{p.qty}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Divider + total */}
+                  <div className="border-t border-sky-200 mt-4 pt-3 flex items-center justify-between">
+                    <span className="text-h5 font-bold text-text-primary">ยอดชำระสุทธิ</span>
+                    <span className="text-h3 font-bold tabular-nums" style={{ color: '#0197FF' }}>{fmt(netTotal)}</span>
+                  </div>
+                </div>
+
+                {/* Cashier info */}
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <div className="text-c1 text-text-secondary">ผู้ขาย</div>
+                    <div className="text-c1 text-text-secondary">เครื่อง</div>
+                  </div>
+                  <div className="text-right space-y-1">
+                    <div className="text-c1 font-bold text-text-primary">{me?.name ?? 'นายมานะ ปิติ'}</div>
+                    <div className="text-c1 font-bold text-text-primary">#POS-001</div>
+                  </div>
+                </div>
+
+                {/* Yellow doc button */}
+                <button
+                  type="button"
+                  className="w-full h-14 rounded-[12px] flex items-center justify-center gap-2 text-h5 font-bold transition hover:brightness-95"
+                  style={{ backgroundColor: YELLOW, color: NAVY }}
+                >
+                  <FileText className="w-5 h-5" />
+                  ดูเอกสารใบเตรียมสินค้า
+                </button>
+              </div>
+
+              {/* Footer 3 actions */}
+              <div className="px-6 py-4 border-t border-gray-200 grid grid-cols-3 gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowOrderSuccess(false)}
+                  className="h-12 rounded-[12px] border border-gray-300 bg-white text-c1 text-text-primary hover:bg-bg-page-2 transition flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  บันทึก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { window.print(); setShowOrderSuccess(false); }}
+                  className="h-12 rounded-[12px] border border-gray-300 bg-white text-c1 text-text-primary hover:bg-bg-page-2 transition flex items-center justify-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  บันทึก+พิมพ์
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOrderSuccess(false)}
+                  className="h-12 rounded-[12px] border border-rose-200 bg-white text-c1 text-rose-500 hover:bg-rose-50 transition flex items-center justify-center gap-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  ปิดหน้าต่าง
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <RegisterMemberDialog open={showRegister} onClose={() => setShowRegister(false)}
         onRegistered={c => { setCustomer(c); setShowRegister(false); }} />
@@ -2829,13 +3189,13 @@ export default function POSScreen() {
 
                   {/* Delivery details — show whenever any item is delivery */}
                   {deliveryCount > 0 && (
-                    <div className="space-y-2.5">
+                    <div className="rounded-[14px] bg-sky-50 border border-sky-200 p-3 space-y-3">
                       {/* Address */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-c1 text-text-secondary">ที่อยู่สำหรับจัดส่ง</span>
                           {selectedAddress && (
-                            <button type="button" onClick={() => setShowAddressDialog(true)} className="text-c1 text-sky-500 hover:underline">เปลี่ยนที่อยู่</button>
+                            <button type="button" onClick={() => setShowAddressDialog(true)} className="text-c2 text-sky-500 underline hover:text-sky-600">เปลี่ยนที่อยู่</button>
                           )}
                         </div>
                         {selectedAddress ? (
@@ -2850,7 +3210,7 @@ export default function POSScreen() {
                             </div>
                           </div>
                         ) : (
-                          <button type="button" onClick={() => setShowAddressDialog(true)} className="w-full h-10 rounded-[10px] border border-dashed border-gray-300 text-c1 text-sky-500 hover:bg-bg-page-2 transition">
+                          <button type="button" onClick={() => setShowAddressDialog(true)} className="w-full h-10 rounded-[10px] border border-dashed border-sky-300 bg-white text-c1 text-sky-500 hover:bg-sky-50 transition">
                             + เพิ่มที่อยู่
                           </button>
                         )}
@@ -2858,7 +3218,7 @@ export default function POSScreen() {
                       {/* Courier + Contact — only after an address is picked */}
                       {selectedAddress && (
                         <>
-                          <div>
+                          <div className="border-t border-sky-200 pt-3">
                             <div className="text-c1 text-text-secondary mb-1.5">เลือกบริษัทขนส่ง</div>
                             <div className="relative">
                               <select
@@ -2939,26 +3299,28 @@ export default function POSScreen() {
                     );
                   }
                   return (
-                    <button
-                      type="button"
-                      onClick={() => setShowPackagingDialog(true)}
-                      className="w-full hover:opacity-90 transition text-left"
-                    >
-                      <div className="flex flex-wrap gap-1.5">
-                        {packaging.map(p => {
-                          const tag = TAG_COLOR[p.category] ?? { bg: 'bg-gray-100', text: 'text-gray-700' };
-                          return (
-                            <span
-                              key={p.id}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-c2 font-medium ${tag.bg} ${tag.text}`}
+                    <div className="flex flex-wrap gap-1.5">
+                      {packaging.map(p => {
+                        const tag = TAG_COLOR[p.category] ?? { bg: 'bg-gray-100', text: 'text-gray-700' };
+                        return (
+                          <span
+                            key={p.id}
+                            className={`inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-c2 font-medium ${tag.bg} ${tag.text}`}
+                          >
+                            <span>{p.name}</span>
+                            <span className="font-bold">×{p.qty}</span>
+                            <button
+                              type="button"
+                              onClick={() => setPackaging(prev => prev.filter(x => x.id !== p.id))}
+                              className="w-4 h-4 flex items-center justify-center rounded-full bg-white/70 hover:bg-white transition"
+                              title="ลบรายการนี้"
                             >
-                              <span>{p.name}</span>
-                              <span className="font-bold">×{p.qty}</span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </button>
+                              <X className="w-2.5 h-2.5" strokeWidth={2.5} />
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
                   );
                 })()}
               </SidebarSection>
@@ -3030,6 +3392,17 @@ export default function POSScreen() {
             const noItems = cartItems.length === 0;
             const noCustomer = customer === null;
             const isDisabled = noItems || noCustomer;
+            // Bill summary entry flow: gift-scan warning → near-promo warning → main summary
+            const unscannedBuyGet = mockBuyGetItems.filter(i => !claimedBuyGetSkus.has(i.sku));
+            const unscannedOrderGifts = mockOrderGifts.filter(g => totals.grand >= g.threshold && !claimedOrderGiftIds.has(g.id));
+            const unscannedBrandPromos = mockBrandPromos.filter(b => b.spend >= b.threshold && !claimedBrandPromoNames.has(b.brand));
+            const hasUnscanned = unscannedBuyGet.length > 0 || unscannedOrderGifts.length > 0 || unscannedBrandPromos.length > 0;
+            const nearPromos = mockBrandPromos.filter(bp => bp.spend < bp.threshold);
+            const hasNearPromo = nearPromos.length > 0;
+            const openBillSummary = () => {
+              if (hasUnscanned || hasNearPromo) setShowBillIntercept(true);
+              else { setShowFulfillmentSummaryFull(true); setShowFulfillmentSummary(true); }
+            };
             const tooltipMsg = noItems && noCustomer
               ? 'กรุณาเลือกลูกค้าและเพิ่มสินค้าก่อน'
               : noCustomer ? 'กรุณาเลือกลูกค้าก่อน'
@@ -3040,7 +3413,7 @@ export default function POSScreen() {
                 <div className="relative group">
                   <button
                     disabled={isDisabled}
-                    onClick={() => setShowPayment(true)}
+                    onClick={openBillSummary}
                     className="w-full h-14 rounded-[12px] text-h5 transition-colors duration-200 disabled:cursor-not-allowed"
                     style={{ backgroundColor: isDisabled ? '#E5E7EB' : YELLOW, color: isDisabled ? '#9CA3AF' : NAVY }}
                   >
