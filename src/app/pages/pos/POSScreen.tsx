@@ -34,6 +34,8 @@ import { CouponPickerDialog } from './CouponPickerDialog';
 import { FulfillmentSummaryDialog, type SummaryFreeItem } from './FulfillmentSummaryDialog';
 import { HeldBillsDialog, type HeldBill } from './HeldBillsDialog';
 import { SlipUploadDialog } from './SlipUploadDialog';
+import OtherMenusDialog from './OtherMenusDialog';
+import DeliveryDocDialog from './DeliveryDocDialog';
 import { ProductSearchDialog } from '../../components/product/ProductSearchDialog';
 import { ProductThumb } from '../../components/ui/ProductThumb';
 import type { Product as MockProduct } from '../../api/mock/products';
@@ -653,6 +655,8 @@ export default function POSScreen() {
   const [showFulfillmentSummary, setShowFulfillmentSummary] = useState(false);
   /** true = opened from F11 path (show full bill summary + footer); false = opened from "ดูเพิ่มเติม" (peek, no totals/footer) */
   const [showFulfillmentSummaryFull, setShowFulfillmentSummaryFull] = useState(false);
+  const [showOtherMenus, setShowOtherMenus] = useState(false);
+  const [showDeliveryDoc, setShowDeliveryDoc] = useState(false);
   /** Single intercept popup before final bill summary (covers unscanned gifts + near-promo). */
   const [showBillIntercept, setShowBillIntercept] = useState(false);
   /** Final "Order placed" success popup shown after the cashier confirms the bill. */
@@ -1968,6 +1972,18 @@ export default function POSScreen() {
       <HeldBillsDialog open={showHeld} bills={heldBills} onClose={() => setShowHeld(false)}
         onRestore={restoreBill} onDelete={deleteHeldBill} />
 
+      <OtherMenusDialog
+        open={showOtherMenus}
+        onClose={() => setShowOtherMenus(false)}
+        onSelectDeliveryDoc={() => { setShowOtherMenus(false); setShowDeliveryDoc(true); }}
+        onSelectCreateInvoice={() => { /* TODO: สร้างใบแจ้งหนี้จากรับคำสั่งซื้อ */ setShowOtherMenus(false); }}
+      />
+
+      <DeliveryDocDialog
+        open={showDeliveryDoc}
+        onClose={() => setShowDeliveryDoc(false)}
+      />
+
       <SlipUploadDialog
         open={showSlipUpload}
         orderId={pendingSlipOrderId}
@@ -2132,7 +2148,7 @@ export default function POSScreen() {
               <FKey hotkey="F3" label="พักบิล"        icon={Pause}     onClick={() => { if (cartItems.length > 0) setShowHoldDialog(true); }} />
               <FKey hotkey="F4" label="ดึงบิล"        icon={Inbox}     count={heldBills.length} onClick={() => setShowHeld(true)} />
               <FKey hotkey="F5" label="ยกเลิกบิล"    icon={Ban}       onClick={() => cartItems.length > 0 && setSupervisorAuth({ mode: 'cancel-bill' })} />
-              <FKey hotkey="F6" label="เมนูอื่นๆ"      icon={LayoutGrid} onClick={handleClearItems} />
+              <FKey hotkey="F6" label="เมนูอื่นๆ"      icon={LayoutGrid} onClick={() => setShowOtherMenus(true)} />
             </div>
           </div>
 
