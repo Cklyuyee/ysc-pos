@@ -36,6 +36,7 @@ import { HeldBillsDialog, type HeldBill } from './HeldBillsDialog';
 import { SlipUploadDialog } from './SlipUploadDialog';
 import OtherMenusDialog from './OtherMenusDialog';
 import DeliveryDocDialog from './DeliveryDocDialog';
+import CreateInvoiceDialog from './CreateInvoiceDialog';
 import { ProductSearchDialog } from '../../components/product/ProductSearchDialog';
 import { ProductThumb } from '../../components/ui/ProductThumb';
 import type { Product as MockProduct } from '../../api/mock/products';
@@ -657,6 +658,7 @@ export default function POSScreen() {
   const [showFulfillmentSummaryFull, setShowFulfillmentSummaryFull] = useState(false);
   const [showOtherMenus, setShowOtherMenus] = useState(false);
   const [showDeliveryDoc, setShowDeliveryDoc] = useState(false);
+  const [showCreateInvoice, setShowCreateInvoice] = useState(false);
   /** Single intercept popup before final bill summary (covers unscanned gifts + near-promo). */
   const [showBillIntercept, setShowBillIntercept] = useState(false);
   /** Final "Order placed" success popup shown after the cashier confirms the bill. */
@@ -1976,12 +1978,17 @@ export default function POSScreen() {
         open={showOtherMenus}
         onClose={() => setShowOtherMenus(false)}
         onSelectDeliveryDoc={() => { setShowOtherMenus(false); setShowDeliveryDoc(true); }}
-        onSelectCreateInvoice={() => { /* TODO: สร้างใบแจ้งหนี้จากรับคำสั่งซื้อ */ setShowOtherMenus(false); }}
+        onSelectCreateInvoice={() => { setShowOtherMenus(false); setShowCreateInvoice(true); }}
       />
 
       <DeliveryDocDialog
         open={showDeliveryDoc}
         onClose={() => setShowDeliveryDoc(false)}
+      />
+
+      <CreateInvoiceDialog
+        open={showCreateInvoice}
+        onClose={() => setShowCreateInvoice(false)}
       />
 
       <SlipUploadDialog

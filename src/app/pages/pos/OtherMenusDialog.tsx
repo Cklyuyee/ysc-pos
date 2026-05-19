@@ -47,9 +47,6 @@ export default function OtherMenusDialog({ open, onClose, onSelectDeliveryDoc, o
           <div className="flex items-center gap-3">
             <LayoutGrid className="w-5 h-5 text-white/70" />
             <span className="text-s1 font-bold text-white">เมนูอื่นๆ</span>
-            <span className="px-2 py-0.5 rounded-[6px] text-c3 font-bold" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFC518' }}>
-              F6
-            </span>
           </div>
           <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
             <X className="w-4 h-4 text-white" />
@@ -75,12 +72,6 @@ export default function OtherMenusDialog({ open, onClose, onSelectDeliveryDoc, o
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-h5 font-bold text-text-primary">{m.title}</span>
-                  <span
-                    className="px-2 py-0.5 rounded-[6px] text-c3 font-bold shrink-0"
-                    style={{ backgroundColor: m.iconColor + '22', color: m.iconColor }}
-                  >
-                    {m.hotkey}
-                  </span>
                 </div>
                 <div className="text-s2 font-bold" style={{ color: m.iconColor }}>{m.subtitle}</div>
                 <div className="text-c1 text-text-muted mt-1 leading-relaxed">{m.desc}</div>
