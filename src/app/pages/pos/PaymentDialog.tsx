@@ -138,9 +138,15 @@ export function PaymentDialog({ open, onClose, onConfirm, totalAmount, customer,
         <div className="px-6 pt-5 pb-3">
           <div className="text-c3 font-bold text-neutral-500 uppercase tracking-wider mb-3">วิธีชำระเงิน</div>
           <div className="flex gap-2">
-            <MethodTab active={method === 'cash'}   icon={Banknote}   label="เงินสด"       onClick={() => setMethod('cash')} />
-            <MethodTab active={method === 'card'}   icon={CreditCard}  label="บัตรเครดิต"  onClick={() => setMethod('card')} />
-            <MethodTab active={method === 'qr'}     icon={QrCode}      label="QR / โอน"    onClick={() => setMethod('qr')} />
+            <MethodTab active={method === 'cash'} icon={Banknote}   label="เงินสด"      onClick={() => setMethod('cash')} />
+            <MethodTab active={method === 'card'} icon={CreditCard} label="บัตรเครดิต"  onClick={() => setMethod('card')} />
+            <MethodTab active={method === 'qr'}   icon={QrCode}     label="QR / โอน"    onClick={() => setMethod('qr')} />
+            {/* Credit (วงเงินเครดิต) — only for customers who actually have a credit account.
+                Walk-in customers (no customer selected) or customers with creditLimit = 0
+                must use cash / card / QR. */}
+            {customer && (customer.creditLimit ?? 0) > 0 && (
+              <MethodTab active={method === 'credit'} icon={Building2} label="วงเงินเครดิต" onClick={() => setMethod('credit')} />
+            )}
           </div>
         </div>
 

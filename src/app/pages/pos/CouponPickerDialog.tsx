@@ -16,7 +16,7 @@ export interface CouponItem {
 }
 
 /** Threshold (days) under which a coupon is marked as near-expiry. */
-export const NEAR_EXPIRY_DAYS = 15;
+export const NEAR_EXPIRY_DAYS = 30;
 
 const COLOR_BG: Record<CouponItem['color'], string> = {
   sky:    '#0EA5E9',
@@ -58,15 +58,17 @@ export function CouponPickerDialog({ open, onClose, coupons, applied, cartTotal 
   /** Decide whether a coupon is currently usable. */
   const disabledReason = (c: CouponItem): string | null => {
     if (c.minPurchase != null && cartTotal < c.minPurchase) return 'ยอดซื้อยังไม่ถึงขั้นต่ำ';
-    // Discount-stack constraint: total discount must not exceed cart total
-    if (!selected.includes(c.id) && selectedDiscount + c.amount > cartTotal) return 'ส่วนลดเกินยอดซื้อ';
+    // Over-cart-total coupons are allowed — excess is forfeit automatically (no cash refund).
     return null;
   };
+
+  /** True if selected coupons total > cart (excess is auto-trimmed, no refund). */
+  const hasExcessDiscount = selectedDiscount > cartTotal;
+  const excessAmount = Math.max(0, selectedDiscount - cartTotal);
 
   const toggle = (id: string) => {
     const c = coupons.find(x => x.id === id);
     if (!c) return;
-    // Always allow deselect; only block new selections that fail constraints
     if (!selected.includes(id) && disabledReason(c)) return;
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
@@ -172,6 +174,18 @@ export function CouponPickerDialog({ open, onClose, coupons, applied, cartTotal 
             </div>
           )}
         </div>
+
+        {/* Excess-discount notice (shown above the footer when applicable) */}
+        {hasExcessDiscount && (
+          <div className="px-6 py-3 bg-amber-50 border-t border-amber-200 flex items-start gap-2 text-c1 text-amber-800">
+            <svg className="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <div>
+              <span className="font-bold">ส่วนลดเกินยอดซื้อ {fmt(excessAmount)}</span> — ระบบจะตัดส่วนเกินออก ไม่ทอนเงินคืน
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 bg-bg-page border-t border-gray-200 flex gap-3 shrink-0">

@@ -178,6 +178,11 @@ export interface Customer {
   // Document Settings
   docType?: 'Y (Full VAT)' | 'N (No VAT)' | 'M (Mixed V/I)' | 'A (Abbreviated)';
 
+  // Account status — drives credit / blacklist UI gates
+  // (Common values: "active" | "suspended" | "blacklist" — kept as string so
+  //  unexpected backend values still flow through without crashing the UI.)
+  status?: string;
+
   // Sales Representative
   salesRep?: {
     name: string;

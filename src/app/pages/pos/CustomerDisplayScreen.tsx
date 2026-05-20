@@ -29,11 +29,9 @@ const ClockDisplay = memo(function ClockDisplay() {
     return () => clearInterval(t);
   }, []);
   return (
-    <div className="text-right shrink-0">
-      <div className="text-white font-black text-3xl tabular-nums leading-tight">
-        {fmtTimeClock(now)}
-      </div>
-      <div className="text-white/60 text-sm mt-0.5">{fmtDateTH(now)}</div>
+    <div className="text-right shrink-0 leading-tight">
+      <div className="text-h5 font-bold text-white tabular-nums">{fmtTimeClock(now)}</div>
+      <div className="text-c3 font-normal text-white/60">{fmtDateTH(now)}</div>
     </div>
   );
 });
@@ -41,14 +39,18 @@ const ClockDisplay = memo(function ClockDisplay() {
 // ─── Banner slides ─────────────────────────────────────────────────────────────
 /**
  * Banners use static images placed in /public:
- *   - /banner-sports.png    (blue gradient, sports balls + "ลด 40%")
- *   - /banner-duracell.png  (pink, 9V battery + "฿96")
- * The image is rendered with `object-cover` so it fills the banner area cleanly.
- * To add a new slide, drop a PNG/JPG in /public and add an entry to BANNER_SLIDES.
+ *   - /banner-1.png  Sports — ลด 40%
+ *   - /banner-2.png  Duracell ถ่านอัลคาไลน์ 9V — ฿96
+ *   - /banner-3.png  คาราวานเครื่องเขียน — ลด 50%
+ *   - /banner-4.png  SUMMER SALE — ลด 60%
+ * Rendered with `object-cover` so the image fills the banner area cleanly.
+ * To add a new slide, drop a PNG/JPG in /public and append to BANNER_SLIDES.
  */
 const BANNER_SLIDES = [
-  { id: 'sports',   src: '/banner-sports.png',   bg: '#1D4ED8' },
-  { id: 'duracell', src: '/banner-duracell.png', bg: '#FDE8E0' },
+  { id: 'banner-1', src: '/banner-1.png', bg: '#1D4ED8' },
+  { id: 'banner-2', src: '/banner-2.png', bg: '#FDE8E0' },
+  { id: 'banner-3', src: '/banner-3.png', bg: '#16A34A' },
+  { id: 'banner-4', src: '/banner-4.png', bg: '#0EA5E9' },
 ];
 
 /**
@@ -67,7 +69,10 @@ const BannerCarousel = memo(function BannerCarousel() {
   }, []);
 
   return (
-    <div className="h-[165px] shrink-0 rounded-[16px] overflow-hidden relative bg-[#1D4ED8]">
+    <div
+      className="shrink-0 rounded-[16px] overflow-hidden relative bg-[#1D4ED8] w-full"
+      style={{ aspectRatio: '7 / 1', minHeight: 120, maxHeight: 200 }}
+    >
       {BANNER_SLIDES.map((slide, i) => (
         <img
           key={slide.id}
@@ -115,9 +120,24 @@ const CartItemRow = memo(function CartItemRow({
 }) {
   const lineDiscount = item.lineDiscount ?? 0;
   const tags = item.promotionTags ?? [];
+  const trRef = useRef<HTMLTableRowElement>(null);
+
+  // Restart the flash animation each time this row becomes "last scanned" — even
+  // if the same SKU is rescanned (qty increments). Remove the class, force a
+  // reflow, then re-add so the CSS keyframes run from 0%.
+  useEffect(() => {
+    if (!isLast || !trRef.current) return;
+    const tr = trRef.current;
+    tr.classList.remove('animate-cart-flash');
+    void tr.offsetWidth; // reflow
+    tr.classList.add('animate-cart-flash');
+  }, [isLast, item.qty]);
 
   return (
-    <tr className={`border-b border-gray-100 last:border-b-0 ${isLast ? 'bg-sky-50' : 'bg-white'}`}>
+    <tr
+      ref={trRef}
+      className={`border-b border-gray-100 last:border-b-0 animate-cart-in ${isLast ? 'animate-cart-flash' : 'bg-white'}`}
+    >
       {/* Name + image */}
       <td className="px-5 py-2">
         <div className="flex items-center gap-4">
@@ -151,7 +171,7 @@ const CartItemRow = memo(function CartItemRow({
         <span className="text-h5 text-gray-900 tabular-nums">{fmt(lineDiscount)}</span>
       </td>
       <td className="px-5 py-2 text-right">
-        <span className="text-h5 text-gray-900 tabular-nums">{fmt(item.lineTotal)}</span>
+        <span className="text-h5 tabular-nums" style={{ color: NAVY }}>{fmt(item.lineTotal)}</span>
       </td>
     </tr>
   );
@@ -191,7 +211,7 @@ const CustomerHeaderInfo = memo(function CustomerHeaderInfo({ info }: { info: Cu
       )}
       {info.memberTier && (
         <span className="px-4 py-1 rounded-full border border-white/50 text-white font-bold text-base">
-          Tier : {info.memberTier}
+          Price : {info.memberTier}
         </span>
       )}
     </div>
@@ -240,7 +260,7 @@ const ProductTableCard = memo(function ProductTableCard({
           <col style={{ width: 190 }} />
         </colgroup>
         <thead>
-          <tr style={{ backgroundColor: '#1e293b' }}>
+          <tr style={{ backgroundColor: '#111827' }}>
             <th className="text-left  px-5 py-4 text-lg font-bold text-white whitespace-nowrap">รายการสินค้า</th>
             <th className="text-center px-5 py-4 text-lg font-bold text-white whitespace-nowrap">จำนวน</th>
             <th className="text-right  px-5 py-4 text-lg font-bold text-white whitespace-nowrap">ราคา/หน่วย</th>
@@ -288,7 +308,7 @@ const TotalCard = memo(function TotalCard({
   return (
     <div className="shrink-0 bg-white rounded-[16px] shadow-sm overflow-hidden">
       <div className="px-5 py-3 text-center" style={{ backgroundColor: '#111827' }}>
-        <span className="text-b3 font-bold text-white tracking-wide">ยอดชำระสุทธิ (TOTAL)</span>
+        <span className="text-h5 text-white tracking-wide">ยอดชำระสุทธิ (TOTAL)</span>
       </div>
       <div className="px-5 py-5">
         <div className="text-center mb-5">
@@ -346,7 +366,7 @@ const FreeItemsCard = memo(function FreeItemsCard({
       style={{ backgroundColor: '#E8F8EE' }}
     >
       <div className="px-5 py-3 shrink-0" style={{ backgroundColor: GREEN }}>
-        <span className="text-white font-bold text-b3 leading-snug">
+        <span className="text-h5 text-white leading-snug">
           ของแถม / สิทธิ์ประโยชน์ที่คุณได้รับ
         </span>
       </div>
@@ -465,7 +485,7 @@ export default function CustomerDisplayScreen() {
 
       {/* ─── Header bar ─── */}
       <div
-        className="flex items-center justify-between px-8 h-[80px] shrink-0 border-b-2 border-white/20"
+        className="flex items-center justify-between px-8 h-[64px] shrink-0 border-b-2 border-white/20"
         style={{ backgroundColor: NAVY }}
       >
         {/* Logo */}
@@ -473,7 +493,7 @@ export default function CustomerDisplayScreen() {
           <img
             src="/logo-ysc.png"
             alt="Yong Charaden"
-            className="h-12 w-auto object-contain select-none pointer-events-none"
+            className="h-10 w-auto object-contain select-none pointer-events-none"
             draggable={false}
           />
         </div>
@@ -496,7 +516,7 @@ export default function CustomerDisplayScreen() {
           <BannerCarousel />
         </div>
         {/* RIGHT */}
-        <div className="w-[340px] shrink-0 flex flex-col gap-3 overflow-hidden">
+        <div className="w-[400px] shrink-0 flex flex-col gap-3 overflow-hidden">
           <TotalCard
             grand={grand}
             subtotal={subtotal}

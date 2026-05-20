@@ -7,12 +7,12 @@ const NAVY = '#0B1E8A';
 const YELLOW = '#FFC518';
 
 const TIER_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-  'Gold 1':    { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Gold Member' },
-  'Gold 2':    { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Gold Member' },
-  'Platinum 1':{ bg: 'bg-purple-100', text: 'text-purple-800', label: 'Platinum Member' },
-  'Platinum 2':{ bg: 'bg-purple-100', text: 'text-purple-800', label: 'Platinum Member' },
-  'Diamond':   { bg: 'bg-sky-100',    text: 'text-sky-800',    label: 'Diamond Member' },
-  'Silver':    { bg: 'bg-neutral-100',text: 'text-neutral-600',label: 'Silver Member' },
+  'Gold 1':    { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Gold' },
+  'Gold 2':    { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Gold' },
+  'Platinum 1':{ bg: 'bg-purple-100', text: 'text-purple-800', label: 'Platinum' },
+  'Platinum 2':{ bg: 'bg-purple-100', text: 'text-purple-800', label: 'Platinum' },
+  'Diamond':   { bg: 'bg-sky-100',    text: 'text-sky-800',    label: 'Diamond' },
+  'Silver':    { bg: 'bg-neutral-100',text: 'text-neutral-600',label: 'Silver' },
 };
 
 interface Props {
@@ -145,7 +145,7 @@ export function CustomerSearchDialog({ open, onClose, onSelect, onRegister, mode
         </div>
 
         {/* Search inputs (2 columns) */}
-        <div className="px-6 py-5 grid grid-cols-2 gap-4 shrink-0">
+        <div className="px-6 py-5 grid grid-cols-2 gap-4 shrink-0 border-b border-gray-200">
           <div className="flex flex-col gap-2">
             <label className="text-c1 text-text-secondary">รหัสลูกค้า</label>
             <div className="relative">
@@ -185,7 +185,7 @@ export function CustomerSearchDialog({ open, onClose, onSelect, onRegister, mode
         </div>
 
         {/* Results section */}
-        <div className="flex-1 overflow-y-auto px-6 pb-5">
+        <div className="flex-1 overflow-y-auto px-6 pt-5 pb-5">
           <div className="flex items-center justify-between mb-2">
             <div className="text-c1 text-text-secondary">
               ผลการค้นหา{searched ? ` (${results.length})` : ''}

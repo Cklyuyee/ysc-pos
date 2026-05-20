@@ -6,6 +6,7 @@ import {
   ChevronRight, Plus, AlertTriangle, UserCircle, Settings, Power,
   RefreshCw, Pause, Inbox, Ban, LayoutGrid, Crown, User, Package, X,
   MapPin, Warehouse, Eye, Check, Phone, Box, ChevronDown, ChevronUp, Monitor,
+  Star, Award, Shield, Gem,
   ShoppingCart, Pencil, Hourglass, Clock, CheckCircle2, Trophy, Ticket,
   BadgeCheck, FileText, Calendar, Save, Printer,
 } from 'lucide-react';
@@ -30,7 +31,7 @@ import { SupervisorAuthDialog, type SupervisorAuthMode } from './SupervisorAuthD
 import { CreditApprovalDialog } from './CreditApprovalDialog';
 import { AddressPickerDialog } from './AddressPickerDialog';
 import { PackagingPickerDialog, type SelectedPackaging } from './PackagingPickerDialog';
-import { CouponPickerDialog } from './CouponPickerDialog';
+import { CouponPickerDialog, NEAR_EXPIRY_DAYS } from './CouponPickerDialog';
 import { FulfillmentSummaryDialog, type SummaryFreeItem } from './FulfillmentSummaryDialog';
 import { HeldBillsDialog, type HeldBill } from './HeldBillsDialog';
 import { SlipUploadDialog } from './SlipUploadDialog';
@@ -58,13 +59,16 @@ const fmtThaiBE = (iso: string): string => {
   return `${dd}/${mm}/${yy}`;
 };
 
-const TIER_MAP: Record<string, { bg: string; text: string; border: string; label: string }> = {
-  'Gold 1':    { bg: 'bg-amber-100',   text: 'text-amber-800',   border: 'border-amber-200',  label: 'Gold Member' },
-  'Gold 2':    { bg: 'bg-amber-100',   text: 'text-amber-800',   border: 'border-amber-200',  label: 'Gold Member' },
-  'Platinum 1':{ bg: 'bg-purple-100',  text: 'text-purple-800',  border: 'border-purple-200', label: 'Platinum Member' },
-  'Platinum 2':{ bg: 'bg-purple-100',  text: 'text-purple-800',  border: 'border-purple-200', label: 'Platinum Member' },
-  'Diamond':   { bg: 'bg-sky-100',     text: 'text-sky-800',     border: 'border-sky-200',    label: 'Diamond Member' },
-  'Silver':    { bg: 'bg-neutral-100', text: 'text-neutral-700', border: 'border-neutral-300',label: 'Silver Member' },
+type TierIcon = typeof Crown;
+const TIER_MAP: Record<string, { bg: string; text: string; border: string; label: string; icon: TierIcon }> = {
+  'Member':     { bg: 'bg-sky-500',       text: 'text-white',         border: 'border-sky-500',     label: 'Member',   icon: Star },
+  'Silver':     { bg: 'bg-neutral-200',   text: 'text-neutral-700',   border: 'border-neutral-300', label: 'Silver',   icon: Shield },
+  'Gold 1':     { bg: 'bg-amber-400',     text: 'text-white',         border: 'border-amber-400',   label: 'Gold',     icon: Award },
+  'Gold 2':     { bg: 'bg-amber-400',     text: 'text-white',         border: 'border-amber-400',   label: 'Gold',     icon: Award },
+  'Platinum 1': { bg: 'bg-slate-700',     text: 'text-white',         border: 'border-slate-700',   label: 'Platinum', icon: Crown },
+  'Platinum 2': { bg: 'bg-slate-700',     text: 'text-white',         border: 'border-slate-700',   label: 'Platinum', icon: Crown },
+  'Diamond':    { bg: 'bg-sky-100',       text: 'text-sky-800',       border: 'border-sky-200',     label: 'Diamond',  icon: Gem },
+  'Coronet':    { bg: 'bg-purple-700',    text: 'text-white',         border: 'border-purple-700',  label: 'Coronet',  icon: Crown },
 };
 
 // ─── Mock promotion tags (replace with real /promotions API when available) ───
@@ -101,7 +105,7 @@ function PromoTagList({ brand, size = 'sm' }: { brand?: string; size?: 'xs' | 's
       {tags.map(tag => (
         <span
           key={tag.label}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium leading-none ${textCls} ${PROMO_TAG_STYLES[tag.color]}`}
+          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[6px] font-medium leading-none ${textCls} ${PROMO_TAG_STYLES[tag.color]}`}
         >
           <Tag style={{ width: iconSize, height: iconSize }} strokeWidth={2.5} className="shrink-0" />
           {tag.label}
@@ -109,6 +113,36 @@ function PromoTagList({ brand, size = 'sm' }: { brand?: string; size?: 'xs' | 's
       ))}
     </div>
   )
+}
+
+// ─── AnimatedCartTr ───────────────────────────────────────────────────────────
+/**
+ * <tr> wrapper that:
+ *  - slides in on mount (animate-cart-in, runs once per row mount)
+ *  - flashes whenever `qty` changes (re-scan of same SKU OR manual edit)
+ * Restart trick: remove the animate class, force a reflow, then re-add so the
+ * CSS keyframes run from 0% again.
+ */
+function AnimatedCartTr({
+  qty, className = '', children, ...rest
+}: { qty: number; className?: string; children: React.ReactNode } &
+   React.HTMLAttributes<HTMLTableRowElement>) {
+  const ref = useRef<HTMLTableRowElement>(null);
+  const prevQty = useRef(qty);
+  useEffect(() => {
+    if (qty === prevQty.current) return;
+    prevQty.current = qty;
+    const tr = ref.current;
+    if (!tr) return;
+    tr.classList.remove('animate-cart-flash');
+    void tr.offsetWidth; // reflow
+    tr.classList.add('animate-cart-flash');
+  }, [qty]);
+  return (
+    <tr ref={ref} className={`animate-cart-in ${className}`} {...rest}>
+      {children}
+    </tr>
+  );
 }
 
 // ─── StockCheckDialog ─────────────────────────────────────────────────────────
@@ -449,16 +483,15 @@ function CustomerCard({ customer, onClear: _onClear, cartTotal = 0, onApproveCre
             <button
               type="button"
               onClick={() => setShowInfo(false)}
-              className="flex-1 h-13 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-bg-page-2 transition"
-              style={{ height: '52px' }}
+              className="flex-1 h-12 rounded-[12px] border border-gray-300 bg-white text-h5 text-text-primary hover:bg-bg-page-2 transition"
             >
               ยกเลิก
             </button>
             <button
               type="button"
               onClick={() => setShowInfo(false)}
-              className="flex-1 h-13 rounded-[12px] text-s2 font-extrabold transition hover:brightness-95"
-              style={{ height: '52px', backgroundColor: YELLOW, color: NAVY }}
+              className="flex-[2] h-12 rounded-[12px] text-h5 font-bold transition hover:brightness-95"
+              style={{ backgroundColor: YELLOW, color: NAVY }}
             >
               Enter - ตกลง
             </button>
@@ -484,14 +517,15 @@ function CustomerCard({ customer, onClear: _onClear, cartTotal = 0, onApproveCre
 
       {/* Tier badges */}
       {(() => {
-        const t = TIER_MAP[customer.tier] ?? { bg: 'bg-neutral-100', text: 'text-neutral-700', label: customer.tier };
+        const t = TIER_MAP[customer.tier] ?? { bg: 'bg-neutral-100', text: 'text-neutral-700', label: customer.tier, icon: Crown };
+        const TierIconComp = t.icon;
         return (
           <div className="flex items-center gap-2 flex-wrap">
             <div className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-b4 ${t.bg} ${t.text}`}>
-              <Crown className="w-4 h-4" /> {t.label}
+              <TierIconComp className="w-4 h-4" /> {t.label}
             </div>
             <div className="rounded-full border border-white/30 px-4 py-1.5 text-b4 text-white">
-              Tier : {customer.priceTier}
+              Price : {customer.priceTier}
             </div>
           </div>
         );
@@ -547,10 +581,10 @@ function CustomerCard({ customer, onClear: _onClear, cartTotal = 0, onApproveCre
             </div>
 
             {/* Progress bar — (used + cartTotal) / credit */}
-            <div className="h-2 rounded-full mb-3" style={{ backgroundColor: '#E5E7EB' }}>
+            <div className="h-3 rounded-full mb-3 overflow-hidden" style={{ backgroundColor: '#E5E7EB' }}>
               <div
                 className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${usedPct}%`, backgroundColor: barColor }}
+                style={{ width: `${Math.max(usedPct, usedPct > 0 ? 2 : 0)}%`, backgroundColor: barColor }}
               />
             </div>
 
@@ -1292,18 +1326,21 @@ export default function POSScreen() {
     const lines: { label: string; amount: number }[] = []
     mockBrandPromos.forEach(p => {
       if (p.spend >= p.threshold)
-        lines.push({ label: `ส่วนลดโปรแบรนด์ ${p.brand.substring(0, 6)}...`, amount: Math.round(p.spend * 0.05) })
+        lines.push({ label: `ส่วนลดโปรแบรนด์ ${p.brand}`, amount: Math.round(p.spend * 0.05) })
     })
     mockBuyGetItems.forEach(item => {
       const p = productMap.get(item.sku)
-      lines.push({ label: `ส่วนลดสินค้า ${(p?.name ?? item.sku).substring(0, 8)}...`, amount: Math.round(parseFloat(item.unitPrice)) })
+      lines.push({ label: `ส่วนลดสินค้า ${p?.name ?? item.sku}`, amount: Math.round(parseFloat(item.unitPrice)) })
     })
     appliedCoupons.forEach(c => lines.push({ label: `ส่วนลดคูปอง ${c.label.replace('ส่วนลด ', '')}`, amount: c.amount }))
     return lines
   }, [mockBrandPromos, mockBuyGetItems, appliedCoupons, productMap])
 
-  const totalDiscount = discountBreakdown.reduce((s, d) => s + d.amount, 0)
+  const rawDiscount = discountBreakdown.reduce((s, d) => s + d.amount, 0)
   const packagingCost = packaging.length > 0 ? 100 : 0
+  /** Cap discount at cart subtotal+packaging — coupon excess is forfeit (no cash refund). */
+  const totalDiscount = Math.min(rawDiscount, totals.subtotal + packagingCost)
+  const excessDiscount = rawDiscount - totalDiscount
   const netTotal = Math.max(0, totals.subtotal - totalDiscount + packagingCost)
 
   /**
@@ -1437,6 +1474,10 @@ export default function POSScreen() {
       ch.postMessage({ type: 'idle' } satisfies DisplayMessage);
       return;
     }
+    // Wait for productMap hydration — if any cart item is missing from the map,
+    // skip this broadcast. The productMap-hydration useEffect will populate it,
+    // which retriggers this broadcast (productMap is in our deps).
+    if (cartItems.some(it => !productMap.has(it.sku))) return;
     // Combine buy-X-get-Y, order gifts, brand promos, and redeemed rewards into one list
     const freeItems = [
       ...Array.from(buygetFreeBySku.values()).map(row => ({
@@ -2288,7 +2329,7 @@ export default function POSScreen() {
                             {(p.brand || out) && (
                               <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                                 {getMockPromoTags(p.brand).map(tag => (
-                                  <span key={tag.label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium leading-none ${PROMO_TAG_STYLES[tag.color]}`}>
+                                  <span key={tag.label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[6px] text-[11px] font-medium leading-none ${PROMO_TAG_STYLES[tag.color]}`}>
                                     <Tag className="shrink-0" style={{ width: 11, height: 11 }} strokeWidth={2.5} />
                                     {tag.label}
                                   </span>
@@ -2347,12 +2388,8 @@ export default function POSScreen() {
                   const lineDiscount = 0; // TODO: backend doesn't expose per-line discount yet
                   const total = price * item.qty - lineDiscount;
                   const fulfillment = fulfillmentMap[item.sku] ?? 'pickup';
-                  // Flag: this item is tied to a promo (buy-get available OR a triggered brand promo)
-                  const hasPromo =
-                    mockBuyGetItems.some(b => b.sku === item.sku) ||
-                    mockBrandPromos.some(bp => bp.brand === product?.brand && bp.spend >= bp.threshold);
                   return (
-                    <tr key={item.sku} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition">
+                    <AnimatedCartTr key={item.sku} qty={item.qty} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition">
                       {/* 1. รหัสสินค้า */}
                       <td className="px-3 py-3 text-c2 font-mono text-text-secondary align-middle">
                         {product?.barcode ?? item.sku}
@@ -2371,15 +2408,6 @@ export default function POSScreen() {
                             </div>
                             <PromoTagList brand={product?.brand} size="xs" />
                           </div>
-                          {hasPromo && (
-                            <span
-                              title="สินค้าตัวนี้มีโปรโมชั่น"
-                              className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-[8px] bg-amber-100 text-amber-700"
-                            >
-                              <Tag className="w-3 h-3" />
-                              <span className="text-[11px] font-bold">โปร</span>
-                            </span>
-                          )}
                         </div>
                       </td>
                       {/* 3. จำนวน (display only) */}
@@ -2468,7 +2496,7 @@ export default function POSScreen() {
                           </button>
                         </div>
                       </td>
-                    </tr>
+                    </AnimatedCartTr>
                   );
                 })}
                 {/* ── Buy-get free rows (at the bottom, paired by association via the icon) ── */}
@@ -2477,7 +2505,7 @@ export default function POSScreen() {
                   const parentMode = fulfillmentMap[parentSku] ?? 'pickup';
                   const freeFulfillment = fulfillmentMap[row.id] ?? parentMode;
                   return (
-                    <tr key={row.id} className="border-b border-neutral-100 bg-green-50/60">
+                    <tr key={row.id} className="border-b border-neutral-100 bg-green-50/60 animate-cart-in">
                       <td className="px-3 py-3 align-middle">
                         <div className="flex items-center justify-center">
                           <Gift className="w-5 h-5 text-green-600" />
@@ -2554,7 +2582,7 @@ export default function POSScreen() {
                   const Icon = row.kind === 'reward' ? Trophy : Gift;
                   const rowFulfillment = fulfillmentMap[row.id] ?? dominantFulfillment;
                   return (
-                    <tr key={row.id} className="border-b border-neutral-100 bg-green-50/60">
+                    <tr key={row.id} className="border-b border-neutral-100 bg-green-50/60 animate-cart-in">
                       {/* 1. รหัสสินค้า → icon only */}
                       <td className="px-3 py-3 align-middle">
                         <div className="flex items-center justify-center">
@@ -2716,10 +2744,11 @@ export default function POSScreen() {
               <SidebarSection icon={TrendingUp} title="คำแนะนำการขายเพิ่มเติม">
                 <div className="space-y-2">
                   {[
+                    { bg: 'bg-violet-100', text: 'text-violet-700', msg: 'สมัครสมาชิกหน้าตู้ → รับราคา P4 + โปรโมชันรายสินค้า/แบรนด์ที่ระบบกำหนด' },
+                    { bg: 'bg-pink-100',   text: 'text-pink-600',   msg: 'สมัครสมาชิก รับคะแนน + ส่วนลด — ทุก ฿1,500 = 1 คะแนน' },
                     { bg: 'bg-green-100',  text: 'text-green-700',  msg: 'ซื้อครบ ฿5,000 → ลด 5%' },
                     { bg: 'bg-sky-100',    text: 'text-sky-600',    msg: 'ซื้อครบ ฿7,000 รับพัดลม M-71 ฟรี 1 ตัว' },
                     { bg: 'bg-amber-100',  text: 'text-amber-700',  msg: `ซื้อครบ ฿10,000 ได้รับราคาพิเศษเฉพาะคุณเท่านั้น ซื้อเพิ่มเพียง ${fmt(Math.max(0, 10000 - totals.grand))} เท่านั้น` },
-                    { bg: 'bg-pink-100',   text: 'text-pink-600',   msg: 'ทุก 1,500 บาท = 1 คะแนน → สมัครเพื่อเริ่มสะสม' },
                   ].map((tip, i) => (
                     <div key={i} className={`flex items-start gap-2.5 px-3 py-2.5 rounded-[12px] ${tip.bg}`}>
                       <Tag className={`w-5 h-5 mt-0.5 shrink-0 ${tip.text}`} />
@@ -3075,15 +3104,12 @@ export default function POSScreen() {
                 sky: '#0EA5E9', red: '#EF4444', green: '#22C55E',
                 amber: '#F59E0B', orange: '#F97316', teal: '#14B8A6', blue: '#3B82F6', purple: '#A855F7',
               };
-              const NEAR_EXPIRY_DAYS = 15;
               const isNear = (c: { daysUntilExpiry?: number }) =>
                 c.daysUntilExpiry !== undefined && c.daysUntilExpiry <= NEAR_EXPIRY_DAYS;
               const cartTotal = totals.grand;
-              const appliedDiscount = appliedCoupons.reduce((s, c) => s + c.amount, 0);
               const reasonFor = (c: { id: string; amount: number; minPurchase?: number }): string | null => {
                 if (c.minPurchase != null && cartTotal < c.minPurchase) return 'ยอดซื้อยังไม่ถึงขั้นต่ำ';
-                const alreadyApplied = appliedCoupons.some(a => a.id === c.id);
-                if (!alreadyApplied && appliedDiscount + c.amount > cartTotal) return 'ส่วนลดเกินยอดซื้อ';
+                // Over-cart-total coupons are allowed — excess is forfeit automatically.
                 return null;
               };
               // Sidebar shows up to 3 featured "default" coupons + any picked-from-popup
@@ -3429,17 +3455,27 @@ export default function POSScreen() {
                         onClick={() => setShowDiscountDetail(d => !d)}
                         className="flex items-center justify-between w-full"
                       >
-                        <span className="text-status-danger font-semibold">รวมส่วนลด</span>
-                        <span className="flex items-center gap-1 text-status-danger font-semibold tabular-nums">
-                          -{fmt(totalDiscount)}
+                        <span className="flex items-center gap-1 text-status-danger font-semibold">
+                          รวมส่วนลด
                           {showDiscountDetail ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                         </span>
+                        <span className="text-status-danger font-semibold tabular-nums">
+                          -{fmt(totalDiscount)}
+                        </span>
                       </button>
+                      {excessDiscount > 0 && (
+                        <div className="flex items-center justify-between text-c2 text-text-muted italic -mt-1">
+                          <span>ส่วนเกินคูปอง {fmt(excessDiscount)}</span>
+                          <span>ไม่ทอนคืน</span>
+                        </div>
+                      )}
                       {showDiscountDetail && (
                         <div className="pl-3 space-y-1 border-l-2 border-red-100">
                           {discountBreakdown.map((d, i) => (
-                            <div key={i} className="flex justify-between text-c2">
-                              <span className="text-text-muted truncate max-w-[160px]">{d.label}</span>
+                            <div key={i} className="flex items-center justify-between text-c2 gap-10">
+                              <span className="text-text-muted flex-1 min-w-0 truncate whitespace-nowrap">
+                                {d.label.length > 80 ? `${d.label.slice(0, 80)}...` : d.label}
+                              </span>
                               <span className="tabular-nums text-status-danger shrink-0">-{fmt(d.amount)}</span>
                             </div>
                           ))}
@@ -3466,24 +3502,22 @@ export default function POSScreen() {
           {/* F11 — สรุปบิล (sidebar bottom) */}
           {(() => {
             const noItems = cartItems.length === 0;
-            const noCustomer = customer === null;
-            const isDisabled = noItems || noCustomer;
+            // Walk-in customers can check out without a member profile —
+            // only block when the cart is empty.
+            const isDisabled = noItems;
             // Bill summary entry flow: gift-scan warning → near-promo warning → main summary
-            const unscannedBuyGet = mockBuyGetItems.filter(i => !claimedBuyGetSkus.has(i.sku));
-            const unscannedOrderGifts = mockOrderGifts.filter(g => totals.grand >= g.threshold && !claimedOrderGiftIds.has(g.id));
-            const unscannedBrandPromos = mockBrandPromos.filter(b => b.spend >= b.threshold && !claimedBrandPromoNames.has(b.brand));
+            // (Promo intercepts only apply when a customer is selected; walk-in skips them.)
+            const unscannedBuyGet = customer ? mockBuyGetItems.filter(i => !claimedBuyGetSkus.has(i.sku)) : [];
+            const unscannedOrderGifts = customer ? mockOrderGifts.filter(g => totals.grand >= g.threshold && !claimedOrderGiftIds.has(g.id)) : [];
+            const unscannedBrandPromos = customer ? mockBrandPromos.filter(b => b.spend >= b.threshold && !claimedBrandPromoNames.has(b.brand)) : [];
             const hasUnscanned = unscannedBuyGet.length > 0 || unscannedOrderGifts.length > 0 || unscannedBrandPromos.length > 0;
-            const nearPromos = mockBrandPromos.filter(bp => bp.spend < bp.threshold);
+            const nearPromos = customer ? mockBrandPromos.filter(bp => bp.spend < bp.threshold) : [];
             const hasNearPromo = nearPromos.length > 0;
             const openBillSummary = () => {
               if (hasUnscanned || hasNearPromo) setShowBillIntercept(true);
               else { setShowFulfillmentSummaryFull(true); setShowFulfillmentSummary(true); }
             };
-            const tooltipMsg = noItems && noCustomer
-              ? 'กรุณาเลือกลูกค้าและเพิ่มสินค้าก่อน'
-              : noCustomer ? 'กรุณาเลือกลูกค้าก่อน'
-              : noItems   ? 'กรุณาเพิ่มสินค้าก่อน'
-              : '';
+            const tooltipMsg = noItems ? 'กรุณาเพิ่มสินค้าก่อน' : '';
             return (
               <div className="p-2 border-t border-gray-200 bg-white">
                 <div className="relative group">
