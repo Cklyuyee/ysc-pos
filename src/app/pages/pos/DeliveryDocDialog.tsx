@@ -28,30 +28,10 @@ interface DeliveryDoc {
   customerId: string;
   date: string;       // YYYY-MM-DD
   address: string;
-  status: 'pending' | 'shipped' | 'delivered' | 'cancelled';
   items: DocItem[];
   createdBy: string;
   note?: string;
 }
-
-const STATUS_LABEL: Record<DeliveryDoc['status'], string> = {
-  pending:   'รอดำเนินการ',
-  shipped:   'จัดส่งแล้ว',
-  delivered: 'ส่งถึงแล้ว',
-  cancelled: 'ยกเลิก',
-};
-const STATUS_COLOR: Record<DeliveryDoc['status'], string> = {
-  pending:   '#D97706',
-  shipped:   '#0EA5E9',
-  delivered: '#16A34A',
-  cancelled: '#EF4444',
-};
-const STATUS_BG: Record<DeliveryDoc['status'], string> = {
-  pending:   '#FFFBEB',
-  shipped:   '#F0F9FF',
-  delivered: '#F0FDF4',
-  cancelled: '#FEF2F2',
-};
 
 const MOCK_DOCS: DeliveryDoc[] = [
   {
@@ -61,7 +41,6 @@ const MOCK_DOCS: DeliveryDoc[] = [
     customerId: 'C-0042',
     date: '2026-05-19',
     address: '123 ถ.สุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110',
-    status: 'pending',
     items: [
       { sku: 'PEN-001', name: 'ปากกาลูกลื่น Pilot G2 สีน้ำเงิน', qty: 12, unit: 'ด้าม', unitPrice: 35 },
       { sku: 'PAP-A4-500', name: 'กระดาษ A4 Double A 80g (1 รีม)', qty: 5, unit: 'รีม', unitPrice: 145 },
@@ -77,7 +56,6 @@ const MOCK_DOCS: DeliveryDoc[] = [
     customerId: 'C-0107',
     date: '2026-05-18',
     address: '55 ถ.พหลโยธิน แขวงลาดยาว เขตจตุจักร กรุงเทพฯ 10900',
-    status: 'shipped',
     createdBy: 'wanna',
     items: [
       { sku: 'NB-A5-LINE', name: 'สมุดโน้ต A5 เส้นบรรทัด 80 แผ่น', qty: 50, unit: 'เล่ม', unitPrice: 28 },
@@ -92,7 +70,6 @@ const MOCK_DOCS: DeliveryDoc[] = [
     customerId: 'C-0215',
     date: '2026-05-17',
     address: '8/12 ซ.ลาดพร้าว 101 เขตลาดพร้าว กรุงเทพฯ 10230',
-    status: 'delivered',
     createdBy: 'somchai',
     items: [
       { sku: 'STAMP-PAD-BK', name: 'แป้นประทับตรา Shiny สีดำ', qty: 2, unit: 'กล่อง', unitPrice: 95 },
@@ -106,7 +83,6 @@ const MOCK_DOCS: DeliveryDoc[] = [
     customerId: 'C-0088',
     date: '2026-05-15',
     address: '77/3 ถ.รัชดาภิเษก แขวงจตุจักร เขตจตุจักร กรุงเทพฯ 10900',
-    status: 'cancelled',
     createdBy: 'napat',
     items: [
       { sku: 'INK-HP-BK', name: 'หมึกพิมพ์ HP 680 สีดำ', qty: 3, unit: 'ตลับ', unitPrice: 285 },
@@ -120,7 +96,6 @@ const MOCK_DOCS: DeliveryDoc[] = [
     customerId: 'C-0033',
     date: '2026-05-14',
     address: '22 ถ.นนทบุรี อ.เมือง นนทบุรี 11000',
-    status: 'delivered',
     createdBy: 'wanna',
     items: [
       { sku: 'CLIP-BINDER', name: 'คลิปดำ ขนาด 2 นิ้ว (12 ตัว/กล่อง)', qty: 5, unit: 'กล่อง', unitPrice: 35 },
@@ -138,6 +113,11 @@ const fmtDate = (s: string) => {
   const [y, m, d] = s.split('-');
   const thMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   return `${parseInt(d)} ${thMonths[parseInt(m) - 1]} ${parseInt(y) + 543}`;
+};
+/** "2026-05-21" → "21/05/2569" (DD/MM/BE) */
+const fmtDateSlash = (s: string) => {
+  const [y, m, d] = s.split('-');
+  return `${d}/${m}/${parseInt(y) + 543}`;
 };
 const docTotal = (items: DocItem[]) => items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
 
@@ -310,18 +290,10 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
         <div className="flex items-center justify-between px-6 py-4 shrink-0" style={{ backgroundColor: NAVY }}>
           <div className="flex items-center gap-3">
             <span className="text-h5 font-bold text-white">
-              {view === 'search' && 'ค้นหา/พิมพ์/แก้ไขใบส่งสินค้า'}
+              {view === 'search' && 'ค้นหา/พิมพ์ใบส่งสินค้า'}
               {view === 'detail' && `ใบส่งสินค้า ${selected?.docNumber}`}
               {view === 'edit' && `แก้ไข ${selected?.docNumber}`}
             </span>
-            {view === 'detail' && selected && (
-              <span
-                className="px-2.5 py-1 rounded-[8px] text-c2 font-bold"
-                style={{ backgroundColor: STATUS_BG[selected.status], color: STATUS_COLOR[selected.status] }}
-              >
-                {STATUS_LABEL[selected.status]}
-              </span>
-            )}
           </div>
           <button type="button" onClick={onClose} className="w-8 h-8 rounded-full hover:bg-white/15 flex items-center justify-center transition">
             <X className="w-5 h-5 text-white" />
@@ -333,7 +305,7 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
           <>
             {/* Filter bar */}
             {/* Filter — 3-col grid, both rows share same column widths */}
-            <div className="px-6 pt-5 pb-4 shrink-0">
+            <div className="px-6 pt-5 pb-4 shrink-0 border-b border-gray-200">
               <div className="grid grid-cols-3 gap-x-3 gap-y-3">
 
                 {/* Row 1 */}
@@ -371,25 +343,29 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                   </div>
                 </div>
 
-                {/* Row 2 */}
+                {/* Row 2 — Date pickers (DD/MM/BE display, native picker hidden underneath) */}
                 <div className="min-w-0">
                   <label className="text-c1 text-text-secondary mb-1.5 block">ตั้งแต่</label>
-                  <div className="flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition cursor-pointer"
+                  <div className="relative flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] hover:border-sky-300 transition cursor-pointer"
                     onClick={() => dateFromRef.current?.showPicker()}>
                     <CalendarDays className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className={`flex-1 text-b3 ${!dateFrom ? 'text-gray-400' : 'text-text-primary'}`}>
+                      {dateFrom ? fmtDateSlash(dateFrom) : 'วว/ดด/ปปปป'}
+                    </span>
                     <input ref={dateFromRef} type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                      className={`flex-1 text-b3 outline-none bg-transparent min-w-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden ${!dateFrom ? 'text-gray-400' : 'text-text-primary'}`} />
+                      className="absolute inset-0 opacity-0 pointer-events-none" tabIndex={-1} />
                   </div>
                 </div>
                 <div className="min-w-0">
                   <label className="text-c1 text-text-secondary mb-1.5 block">ถึงวันที่</label>
-                  <div className="flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition cursor-pointer"
+                  <div className="relative flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] hover:border-sky-300 transition cursor-pointer"
                     onClick={() => dateToRef.current?.showPicker()}>
                     <CalendarDays className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className={`flex-1 text-b3 ${!dateTo ? 'text-gray-400' : 'text-text-primary'}`}>
+                      {dateTo ? fmtDateSlash(dateTo) : 'วว/ดด/ปปปป'}
+                    </span>
                     <input ref={dateToRef} type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                      className={`flex-1 text-b3 outline-none bg-transparent min-w-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden ${!dateTo ? 'text-gray-400' : 'text-text-primary'}`} />
+                      className="absolute inset-0 opacity-0 pointer-events-none" tabIndex={-1} />
                   </div>
                 </div>
                 {/* Row 2 col 3: buttons right-aligned */}
@@ -401,9 +377,9 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                     </button>
                   )}
                   <button type="button" onClick={handleSearch}
-                    className="h-11 px-8 rounded-[10px] text-h5 font-bold transition hover:brightness-95 flex items-center gap-2 whitespace-nowrap"
+                    className="h-11 px-8 rounded-[10px] text-s2 font-bold transition hover:brightness-95 flex items-center gap-2 whitespace-nowrap"
                     style={{ backgroundColor: YELLOW, color: NAVY }}>
-                    <Search className="w-4 h-4" />ค้นหา
+                    <Search className="w-5 h-5" strokeWidth={2.5} />ค้นหา
                   </button>
                 </div>
 
@@ -449,7 +425,6 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                         <th className="text-left px-3 py-2.5 text-c1 text-text-secondary font-semibold">ชื่อลูกค้า</th>
                         <th className="text-right px-4 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">ยอดสุทธิ</th>
                         <th className="text-center px-3 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">ผู้ทำรายการ</th>
-                        <th className="text-center px-3 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">สถานะ</th>
                         <th className="px-3 py-2.5" />
                       </tr>
                     </thead>
@@ -481,24 +456,12 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                           <td className="px-3 py-3 text-center text-text-secondary">
                             {doc.createdBy}
                           </td>
-                          <td className="px-3 py-3 text-center">
-                            <span className="inline-block px-2 py-0.5 rounded-[6px] font-semibold whitespace-nowrap"
-                              style={{ backgroundColor: STATUS_BG[doc.status], color: STATUS_COLOR[doc.status] }}>
-                              {STATUS_LABEL[doc.status]}
-                            </span>
-                          </td>
                           <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center gap-2 justify-end">
                               <button type="button" title="พิมพ์ใบส่งสินค้า" onClick={() => handlePrint(doc)}
                                 className="w-9 h-9 rounded-[8px] flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-text-primary transition">
                                 <Printer className="w-4 h-4" />
                               </button>
-                              {doc.status === 'pending' && (
-                                <button type="button" title="แก้ไขรายการ" onClick={() => openEdit(doc)}
-                                  className="w-9 h-9 rounded-[8px] flex items-center justify-center border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-500 transition">
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -581,10 +544,11 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                             <div className="text-b3 font-medium text-text-primary">{item.name}</div>
                             <div className="text-c2 text-text-muted font-mono mt-0.5">{item.sku}</div>
                           </td>
-                          <td className="px-4 py-3.5 text-right text-b3 tabular-nums text-text-secondary whitespace-nowrap">
-                            {item.qty.toLocaleString()} {item.unit}
+                          <td className="px-4 py-3.5 text-right align-middle">
+                            <div className="text-s2 text-text-primary tabular-nums">{item.qty.toLocaleString()}</div>
+                            <div className="text-c2 text-text-muted">/{item.unit}</div>
                           </td>
-                          <td className="px-4 py-3.5 text-right text-b3 tabular-nums text-text-secondary">
+                          <td className="px-4 py-3.5 text-right text-s2 tabular-nums text-text-primary">
                             ฿{fmt(item.unitPrice)}
                           </td>
                           <td className="px-4 py-3.5 text-right text-b3 font-bold tabular-nums" style={{ color: NAVY }}>
@@ -619,16 +583,6 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                 กลับ
               </button>
               <div className="flex-1" />
-              {selected.status === 'pending' && (
-                <button
-                  type="button"
-                  onClick={() => openEdit(selected)}
-                  className="h-12 px-6 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-gray-50 transition flex items-center gap-2"
-                >
-                  <Pencil className="w-4 h-4" />
-                  แก้ไขรายการ
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => handlePrint(selected)}

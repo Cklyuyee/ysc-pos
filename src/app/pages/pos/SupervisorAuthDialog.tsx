@@ -78,14 +78,14 @@ export function SupervisorAuthDialog({ open, mode, onClose, onConfirm }: Props) 
         {/* Red hero header */}
         <div className="flex flex-col items-center text-center px-6 pt-8 pb-7" style={{ backgroundColor: '#FF0000' }}>
           {isItemMode ? (
-            // Trash bin shape (rounded square)
-            <div className="w-20 h-20 rounded-[16px] border-2 border-white flex items-center justify-center mb-4">
-              <Icon className="w-9 h-9 text-white" strokeWidth={2.5} />
+            // Trash bin — no frame
+            <div className="mb-4">
+              <Icon className="w-14 h-14 text-white" strokeWidth={2.5} />
             </div>
           ) : (
-            // X in circle
-            <div className="w-20 h-20 rounded-full border-2 border-white flex items-center justify-center mb-4">
-              <Icon className="w-9 h-9 text-white" strokeWidth={3} />
+            // X — no frame
+            <div className="mb-4">
+              <Icon className="w-14 h-14 text-white" strokeWidth={3} />
             </div>
           )}
           <div className="text-h3 text-white">{title}</div>

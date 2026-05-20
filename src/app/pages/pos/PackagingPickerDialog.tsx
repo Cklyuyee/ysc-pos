@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
-import { X, Box, Shield, Plus, Minus, Trash2 } from 'lucide-react';
+import { X, Box, Plus, Minus, Trash2 } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-export type PackagingGroup = 'packaging' | 'protector';
-export type PackagingCategory =
-  | 'ลัง' | 'ถุง' | 'ซอง' | 'พาเลท'         // packaging
-  | 'บับเบิ้ล' | 'โฟม' | 'กระดาษ';            // protector
+export type PackagingGroup = 'packaging';
+export type PackagingCategory = 'ลัง' | 'ถุง' | 'ซอง' | 'พาเลท';
 
 export interface PackagingOption {
   id: string;
@@ -37,23 +35,13 @@ const PACKAGING_OPTIONS: PackagingOption[] = [
   { id: 'palate-film', name: 'พาเลท + ฟิล์ม', group: 'packaging', category: 'พาเลท' },
 ];
 
-const PROTECTOR_OPTIONS: PackagingOption[] = [
-  { id: 'bubble-wrap', name: 'บับเบิ้ลแรพ',     group: 'protector', category: 'บับเบิ้ล' },
-  { id: 'foam-sheet',  name: 'แผ่นโฟม',          group: 'protector', category: 'โฟม' },
-  { id: 'paper-fill',  name: 'กระดาษกันกระแทก', group: 'protector', category: 'กระดาษ' },
-];
-
 const PACKAGING_CATS: PackagingCategory[] = ['ลัง', 'ถุง', 'ซอง', 'พาเลท'];
-const PROTECTOR_CATS: PackagingCategory[] = ['บับเบิ้ล', 'โฟม', 'กระดาษ'];
 
 const TAG: Record<PackagingCategory, { bg: string; text: string }> = {
   ลัง:      { bg: 'bg-amber-100',  text: 'text-amber-700' },
   ถุง:      { bg: 'bg-green-100',  text: 'text-green-700' },
   ซอง:      { bg: 'bg-teal-100',   text: 'text-teal-700' },
   พาเลท:    { bg: 'bg-purple-100', text: 'text-purple-700' },
-  บับเบิ้ล:  { bg: 'bg-sky-100',    text: 'text-sky-700' },
-  โฟม:      { bg: 'bg-orange-100', text: 'text-orange-700' },
-  กระดาษ:    { bg: 'bg-rose-100',   text: 'text-rose-700' },
 };
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -67,13 +55,11 @@ interface Props {
 // ─── Dialog ─────────────────────────────────────────────────────────────────
 export function PackagingPickerDialog({ open, onClose, selected, onConfirm }: Props) {
   const [pending, setPending] = useState<SelectedPackaging[]>(selected);
-  const [mainTab, setMainTab] = useState<PackagingGroup>('packaging');
   const [subTab, setSubTab] = useState<PackagingCategory>('ลัง');
 
   useEffect(() => {
     if (open) {
       setPending(selected);
-      setMainTab('packaging');
       setSubTab('ลัง');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,15 +67,10 @@ export function PackagingPickerDialog({ open, onClose, selected, onConfirm }: Pr
 
   if (!open) return null;
 
-  const allOptions   = mainTab === 'packaging' ? PACKAGING_OPTIONS : PROTECTOR_OPTIONS;
-  const subCategories = mainTab === 'packaging' ? PACKAGING_CATS    : PROTECTOR_CATS;
-  const filteredOptions = allOptions.filter(o => o.category === subTab);
+  const filteredOptions = PACKAGING_OPTIONS.filter(o => o.category === subTab);
 
-  const itemsInGroup = (g: PackagingGroup) => pending.filter(p => p.group === g);
-  const totalQty     = (g: PackagingGroup) => itemsInGroup(g).reduce((s, p) => s + p.qty, 0);
-
-  const groupTotal = totalQty(mainTab);
-  const groupItems = itemsInGroup(mainTab);
+  const groupItems = pending;
+  const groupTotal = pending.reduce((s, p) => s + p.qty, 0);
 
   const findItem = (id: string) => pending.find(p => p.id === id);
 
@@ -116,8 +97,6 @@ export function PackagingPickerDialog({ open, onClose, selected, onConfirm }: Pr
     onClose();
   };
 
-  const groupLabel = mainTab === 'packaging' ? 'บรรจุภัณฑ์' : 'วัสดุกันกระแทก';
-
   const NAVY = '#0B1E8A';
   const YELLOW = '#FFC518';
 
@@ -137,7 +116,7 @@ export function PackagingPickerDialog({ open, onClose, selected, onConfirm }: Pr
             </div>
             <div>
               <div className="text-h5 font-bold text-white">วัสดุที่ใช้แพ็ค</div>
-              <div className="text-c2 text-white/60">เลือกบรรจุภัณฑ์และวัสดุกันกระแทก</div>
+              <div className="text-c2 text-white/60">เลือกบรรจุภัณฑ์</div>
             </div>
           </div>
           <button
@@ -148,49 +127,13 @@ export function PackagingPickerDialog({ open, onClose, selected, onConfirm }: Pr
           </button>
         </div>
 
-        {/* Main tabs (segmented control — sky blue active) */}
-        <div className="px-6 pt-5 pb-3 shrink-0">
-          <div className="grid grid-cols-2 gap-1 bg-sky-100 rounded-full p-1">
-            {(['packaging', 'protector'] as const).map(t => {
-              const active = mainTab === t;
-              const Icon = t === 'packaging' ? Box : Shield;
-              const label = t === 'packaging' ? 'บรรจุภัณฑ์' : 'วัสดุกันกระแทก';
-              const count = totalQty(t);
-              return (
-                <button
-                  key={t}
-                  onClick={() => {
-                    setMainTab(t);
-                    setSubTab(t === 'packaging' ? 'ลัง' : 'บับเบิ้ล');
-                  }}
-                  className={`h-10 rounded-full text-c1 font-semibold flex items-center justify-center gap-1.5 transition ${
-                    active
-                      ? 'bg-sky-500 text-white shadow-sm'
-                      : 'bg-white text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                  {count > 0 && (
-                    <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-c2 font-bold flex items-center justify-center ${
-                      active ? 'bg-white text-sky-600' : 'bg-amber-400 text-white'
-                    }`}>
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 pb-3">
+        <div className="flex-1 overflow-y-auto px-6 pt-5 pb-3">
 
           {/* Selected list */}
           <div className="bg-gray-50 rounded-[12px] p-3 mb-4 border border-gray-200">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-c2 text-text-muted">{groupLabel}ที่ใช้</span>
+              <span className="text-c2 text-text-muted">บรรจุภัณฑ์ที่ใช้</span>
               <span className="text-c1 font-bold text-text-primary">
                 {groupTotal} <span className="text-c2 font-normal text-text-muted">ชิ้น</span>
               </span>
@@ -198,7 +141,7 @@ export function PackagingPickerDialog({ open, onClose, selected, onConfirm }: Pr
             {groupItems.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-5 text-text-muted">
                 <Box className="w-8 h-8 text-gray-300 mb-1.5" strokeWidth={1.5} />
-                <span className="text-c2">ยังไม่ได้เลือก{groupLabel}</span>
+                <span className="text-c2">ยังไม่ได้เลือกบรรจุภัณฑ์</span>
               </div>
             ) : (
               <div className="space-y-2">
@@ -238,10 +181,8 @@ export function PackagingPickerDialog({ open, onClose, selected, onConfirm }: Pr
           </div>
 
           {/* Sub-tabs */}
-          <div className={`grid gap-1 mb-3 border-b border-gray-200 ${
-            subCategories.length === 4 ? 'grid-cols-4' : 'grid-cols-3'
-          }`}>
-            {subCategories.map(cat => {
+          <div className="grid grid-cols-4 gap-1 mb-3 border-b border-gray-200">
+            {PACKAGING_CATS.map(cat => {
               const active = subTab === cat;
               return (
                 <button

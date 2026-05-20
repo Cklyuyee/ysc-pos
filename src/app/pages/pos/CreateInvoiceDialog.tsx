@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import {
   X, Search, Trash2, FileText, FilePlus, Printer,
   CheckCircle2, User, Calendar, Hash, CalendarDays,
-  AlertCircle, BadgeCheck, RefreshCcw, Info,
+  AlertCircle, BadgeCheck, RefreshCcw, Info, Pencil,
 } from 'lucide-react';
 import { searchProducts, ApiProduct } from '../../../services/productsApi';
 import { ProductThumb } from '../../components/ui/ProductThumb';
+import { SupervisorAuthDialog } from './SupervisorAuthDialog';
 
 const NAVY = '#0B1E8A';
 const YELLOW = '#FFC518';
@@ -28,7 +29,6 @@ interface PurchaseOrder {
   customer: string;
   customerId: string;
   date: string;
-  status: 'waiting' | 'partial' | 'invoiced' | 'cancelled';
   items: OrderItem[];
   createdBy: string;
   note?: string;
@@ -39,24 +39,6 @@ const CURRENT_STAFF = 'wichai';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const STATUS_LABEL: Record<PurchaseOrder['status'], string> = {
-  waiting:  'รอสร้างใบแจ้งหนี้',
-  partial:  'สร้างบางส่วนแล้ว',
-  invoiced: 'สร้างครบแล้ว',
-  cancelled: 'ยกเลิก',
-};
-const STATUS_COLOR: Record<PurchaseOrder['status'], string> = {
-  waiting:  '#D97706',
-  partial:  '#0EA5E9',
-  invoiced: '#16A34A',
-  cancelled: '#EF4444',
-};
-const STATUS_BG: Record<PurchaseOrder['status'], string> = {
-  waiting:  '#FFFBEB',
-  partial:  '#F0F9FF',
-  invoiced: '#F0FDF4',
-  cancelled: '#FEF2F2',
-};
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -67,7 +49,6 @@ const MOCK_ORDERS: PurchaseOrder[] = [
     customer: 'บริษัท เทคสตาร์ จำกัด',
     customerId: 'C-0055',
     date: '2026-05-17',
-    status: 'waiting',
     items: [
       { sku: 'PEN-001',    name: 'ปากกาลูกลื่น Pilot G2 สีน้ำเงิน',   orderedQty: 24, qty: 24, unit: 'ด้าม',   originalPrice: 33, currentPrice: 35 },
       { sku: 'PAP-A4-500', name: 'กระดาษ A4 Double A 80g (1 รีม)',     orderedQty: 10, qty: 10, unit: 'รีม',    originalPrice: 142, currentPrice: 145 },
@@ -82,7 +63,6 @@ const MOCK_ORDERS: PurchaseOrder[] = [
     customer: 'มหาวิทยาลัยรังสิต',
     customerId: 'C-0120',
     date: '2026-05-15',
-    status: 'partial',
     items: [
       { sku: 'NB-A5-LINE',    name: 'สมุดโน้ต A5 เส้นบรรทัด 80 แผ่น', orderedQty: 100, qty: 100, unit: 'เล่ม', originalPrice: 27, currentPrice: 28 },
       { sku: 'RULER-30',      name: 'ไม้บรรทัด 30 ซม. พลาสติก',        orderedQty: 50,  qty: 50,  unit: 'อัน',  originalPrice: 14, currentPrice: 15 },
@@ -97,7 +77,6 @@ const MOCK_ORDERS: PurchaseOrder[] = [
     customer: 'ร้านเครื่องเขียนดาวทอง',
     customerId: 'C-0031',
     date: '2026-05-12',
-    status: 'invoiced',
     items: [
       { sku: 'STAMP-PAD-BK', name: 'แป้นประทับตรา Shiny สีดำ',         orderedQty: 5, qty: 5, unit: 'กล่อง', originalPrice: 95,  currentPrice: 95 },
       { sku: 'TAPE-OPP-1',   name: 'เทปใส OPP 1 นิ้ว x 50 หลา',       orderedQty: 12, qty: 12, unit: 'ม้วน', originalPrice: 22,  currentPrice: 22 },
@@ -110,7 +89,6 @@ const MOCK_ORDERS: PurchaseOrder[] = [
     customer: 'คุณวิภาดา นาคสุข',
     customerId: 'C-0299',
     date: '2026-05-10',
-    status: 'waiting',
     items: [
       { sku: 'INK-HP-BK',     name: 'หมึกพิมพ์ HP 680 สีดำ',            orderedQty: 5,  qty: 5,  unit: 'ตลับ',  originalPrice: 280, currentPrice: 285 },
       { sku: 'INK-HP-COL',    name: 'หมึกพิมพ์ HP 680 สีสี',             orderedQty: 3,  qty: 3,  unit: 'ตลับ',  originalPrice: 295, currentPrice: 310 },
@@ -124,7 +102,6 @@ const MOCK_ORDERS: PurchaseOrder[] = [
     customer: 'บริษัท กรีนไลฟ์ จำกัด',
     customerId: 'C-0033',
     date: '2026-05-08',
-    status: 'cancelled',
     items: [
       { sku: 'STAPLER-HD-50', name: 'เครื่องเย็บกระดาษ Max HD-50',      orderedQty: 5, qty: 5, unit: 'เครื่อง', originalPrice: 420, currentPrice: 435 },
     ],
@@ -141,6 +118,11 @@ const fmtDate = (s: string) => {
   const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   return `${parseInt(d)} ${thMonths[parseInt(m) - 1]} ${parseInt(y) + 543}`;
 };
+/** "2026-05-21" → "21/05/2569" (DD/MM/BE) */
+const fmtDateSlash = (s: string) => {
+  const [y, m, d] = s.split('-');
+  return `${d}/${m}/${parseInt(y) + 543}`;
+};
 const invoiceTotal = (items: OrderItem[]) => items.reduce((s, i) => s + i.qty * i.currentPrice, 0);
 const fmtDateTime = (d: Date) => {
   const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -154,7 +136,7 @@ const fmtDateTime = (d: Date) => {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-type DialogView = 'search' | 'edit' | 'success';
+type DialogView = 'search' | 'edit' | 'editItems' | 'success';
 
 interface Props {
   open: boolean;
@@ -181,6 +163,9 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
   const [suggestions, setSuggestions] = useState<ApiProduct[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestLoading, setSuggestLoading] = useState(false);
+  /** Pending delete — when set, opens SupervisorAuthDialog. After supervisor
+   *  approval, the row is removed. */
+  const [pendingDeleteSku, setPendingDeleteSku] = useState<string | null>(null);
   const searchRef   = useRef<HTMLInputElement>(null);
   const addSkuRef   = useRef<HTMLInputElement>(null);
   const dateFromRef = useRef<HTMLInputElement>(null);
@@ -192,7 +177,7 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
   }, [open, view]);
 
   useEffect(() => {
-    if (view === 'edit') setTimeout(() => addSkuRef.current?.focus(), 50);
+    if (view === 'editItems') setTimeout(() => addSkuRef.current?.focus(), 50);
   }, [view]);
 
   // debounced product search for edit-view dropdown
@@ -332,15 +317,10 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
           <div className="flex items-center justify-between px-6 py-3 shrink-0" style={{ backgroundColor: NAVY }}>
             <div className="flex items-center gap-3">
               <span className="text-h5 font-bold text-white">
-                {view === 'search'  && 'สร้างใบแจ้งหนี้จากรับคำสั่งซื้อ'}
-                {view === 'edit'    && `สร้างใบแจ้งหนี้ ${selected?.orderNumber}`}
+                {view === 'search'    && 'สร้างใบแจ้งหนี้จากรับคำสั่งซื้อ'}
+                {view === 'edit'      && `สร้างใบแจ้งหนี้ ${selected?.orderNumber}`}
+                {view === 'editItems' && `แก้ไข ${selected?.orderNumber}`}
               </span>
-              {view === 'edit' && selected && (
-                <span className="px-2.5 py-1 rounded-[8px] text-c2 font-bold"
-                  style={{ backgroundColor: STATUS_BG[selected.status], color: STATUS_COLOR[selected.status] }}>
-                  {STATUS_LABEL[selected.status]}
-                </span>
-              )}
             </div>
             <button type="button" onClick={handleClose}
               className="w-9 h-9 rounded-full hover:bg-white/15 flex items-center justify-center transition">
@@ -353,7 +333,7 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
         {view === 'search' && (
           <>
             {/* Filter — 3-col grid, both rows share same column widths */}
-            <div className="px-6 pt-5 pb-4 shrink-0">
+            <div className="px-6 pt-5 pb-4 shrink-0 border-b border-gray-200">
               <div className="grid grid-cols-3 gap-x-3 gap-y-3">
 
                 {/* Row 1 */}
@@ -391,25 +371,29 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                   </div>
                 </div>
 
-                {/* Row 2 */}
+                {/* Row 2 — Date pickers (DD/MM/BE display, native picker hidden underneath) */}
                 <div className="min-w-0">
                   <label className="text-c1 text-text-secondary mb-1.5 block">ตั้งแต่</label>
-                  <div className="flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition cursor-pointer"
+                  <div className="relative flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] hover:border-sky-300 transition cursor-pointer"
                     onClick={() => dateFromRef.current?.showPicker()}>
                     <CalendarDays className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className={`flex-1 text-b3 ${!dateFrom ? 'text-gray-400' : 'text-text-primary'}`}>
+                      {dateFrom ? fmtDateSlash(dateFrom) : 'วว/ดด/ปปปป'}
+                    </span>
                     <input ref={dateFromRef} type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                      className={`flex-1 text-b3 outline-none bg-transparent min-w-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden ${!dateFrom ? 'text-gray-400' : 'text-text-primary'}`} />
+                      className="absolute inset-0 opacity-0 pointer-events-none" tabIndex={-1} />
                   </div>
                 </div>
                 <div className="min-w-0">
                   <label className="text-c1 text-text-secondary mb-1.5 block">ถึงวันที่</label>
-                  <div className="flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition cursor-pointer"
+                  <div className="relative flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] hover:border-sky-300 transition cursor-pointer"
                     onClick={() => dateToRef.current?.showPicker()}>
                     <CalendarDays className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className={`flex-1 text-b3 ${!dateTo ? 'text-gray-400' : 'text-text-primary'}`}>
+                      {dateTo ? fmtDateSlash(dateTo) : 'วว/ดด/ปปปป'}
+                    </span>
                     <input ref={dateToRef} type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                      onClick={e => e.stopPropagation()}
-                      className={`flex-1 text-b3 outline-none bg-transparent min-w-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden ${!dateTo ? 'text-gray-400' : 'text-text-primary'}`} />
+                      className="absolute inset-0 opacity-0 pointer-events-none" tabIndex={-1} />
                   </div>
                 </div>
                 {/* Row 2 col 3: buttons right-aligned */}
@@ -421,9 +405,9 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                     </button>
                   )}
                   <button type="button" onClick={handleSearch}
-                    className="h-11 px-8 rounded-[10px] text-h5 font-bold transition hover:brightness-95 flex items-center gap-2 whitespace-nowrap"
+                    className="h-11 px-8 rounded-[10px] text-s2 font-bold transition hover:brightness-95 flex items-center gap-2 whitespace-nowrap"
                     style={{ backgroundColor: YELLOW, color: NAVY }}>
-                    <Search className="w-4 h-4" />ค้นหา
+                    <Search className="w-5 h-5" strokeWidth={2.5} />ค้นหา
                   </button>
                 </div>
 
@@ -469,18 +453,16 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                         <th className="text-left px-3 py-2.5 text-c1 text-text-secondary font-semibold">ชื่อลูกค้า</th>
                         <th className="text-right px-4 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">ยอดสั่ง</th>
                         <th className="text-center px-3 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">ผู้ทำรายการ</th>
-                        <th className="text-center px-3 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">สถานะ</th>
                         <th className="px-3 py-2.5" />
                       </tr>
                     </thead>
                     <tbody>
                       {results.map((order, i) => {
-                        const canCreate = order.status === 'waiting' || order.status === 'partial';
                         const total = order.items.reduce((s, item) => s + item.orderedQty * item.currentPrice, 0);
                         return (
                           <tr key={order.id}
-                            className={`border-b border-gray-100 last:border-b-0 transition-colors ${canCreate ? 'hover:bg-sky-50 cursor-pointer' : 'opacity-60'} ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
-                            onClick={() => canCreate && setConfirmOrder(order)}>
+                            className={`border-b border-gray-100 last:border-b-0 transition-colors hover:bg-sky-50 cursor-pointer ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
+                            onClick={() => setConfirmOrder(order)}>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1.5">
                                 <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
@@ -504,20 +486,12 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                             <td className="px-3 py-3 text-center text-text-secondary">
                               {order.createdBy}
                             </td>
-                            <td className="px-3 py-3 text-center">
-                              <span className="inline-block px-2 py-0.5 rounded-[6px] font-semibold whitespace-nowrap"
-                                style={{ backgroundColor: STATUS_BG[order.status], color: STATUS_COLOR[order.status] }}>
-                                {STATUS_LABEL[order.status]}
-                              </span>
-                            </td>
                             <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                               <div className="flex items-center gap-2 justify-end">
-                                {canCreate && (
-                                  <button type="button" title="ตรวจสอบและสร้างใบแจ้งหนี้" onClick={() => setConfirmOrder(order)}
-                                    className="w-9 h-9 rounded-[8px] flex items-center justify-center border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-600 transition">
-                                    <FilePlus className="w-4 h-4" />
-                                  </button>
-                                )}
+                                <button type="button" title="ตรวจสอบและสร้างใบแจ้งหนี้" onClick={() => setConfirmOrder(order)}
+                                  className="w-9 h-9 rounded-[8px] flex items-center justify-center border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-600 transition">
+                                  <FilePlus className="w-4 h-4" />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -586,7 +560,8 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
               <div>
                 <div className="text-s2 font-bold mb-3" style={{ color: NAVY }}>รายการสินค้า</div>
 
-                {/* Add SKU — stepper + search (no submit button) */}
+                {/* Add SKU — kept inside 'edit' view but hidden (full edit happens in 'editItems' view) */}
+                {false && (
                 <form onSubmit={handleAddSku} className="flex items-center gap-3 mb-3">
                   <div className="flex items-center gap-2 shrink-0">
                     <button type="button" onClick={() => setAddQty(q => Math.max(1, q - 1))}
@@ -673,6 +648,7 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                     )}
                   </div>
                 </form>
+                )}
 
                 {/* Items table */}
                 <div className="rounded-[14px] border border-gray-200 overflow-hidden">
@@ -684,7 +660,6 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                         <th className="text-center px-3 py-3 text-s2 font-semibold text-text-secondary w-[100px] whitespace-nowrap">จำนวน</th>
                         <th className="text-right  px-3 py-3 text-s2 font-semibold text-text-secondary w-[130px] whitespace-nowrap">ราคา/หน่วย</th>
                         <th className="text-right  px-3 py-3 text-s2 font-semibold text-text-secondary w-[140px] whitespace-nowrap">รวม</th>
-                        <th className="px-3 py-3 w-[70px]" />
                       </tr>
                     </thead>
                     <tbody>
@@ -714,20 +689,11 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                             style={{ color: item.qty > 0 ? NAVY : '#9CA3AF' }}>
                             {item.qty > 0 ? fmt(item.qty * item.currentPrice) : '—'}
                           </td>
-                          <td className="px-3 py-3 align-middle">
-                            <div className="flex items-center justify-center">
-                              <button type="button" onClick={() => removeItem(item.sku)}
-                                title="ลบรายการสินค้า"
-                                className="w-10 h-10 rounded-[10px] bg-status-danger-bg text-status-danger hover:brightness-95 flex items-center justify-center transition">
-                                <Trash2 className="w-5 h-5" strokeWidth={2} />
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                       ))}
                       {editItems.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="px-4 py-12 text-center text-b3 text-text-muted">
+                          <td colSpan={5} className="px-4 py-12 text-center text-b3 text-text-muted">
                             ยังไม่มีรายการสินค้า
                           </td>
                         </tr>
@@ -742,7 +708,6 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                           <td className="px-3 py-3.5 text-right text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
                             ฿{fmt(invoiceTotal(activeItems))}
                           </td>
-                          <td />
                         </tr>
                       </tfoot>
                     )}
@@ -750,19 +715,178 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                 </div>
               </div>
 
-              {/* Note */}
-              <div>
-                <label className="text-c1 text-text-secondary mb-1.5 block">หมายเหตุ</label>
-                <textarea value={editNote} onChange={e => setEditNote(e.target.value)}
-                  rows={2} placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-[12px] text-b3 outline-none focus:border-sky-400 focus:border-2 transition resize-none" />
-              </div>
-
             </div>
 
             {/* Footer */}
             <div className="px-6 py-4 border-t border-gray-200 bg-bg-page flex items-center gap-3 shrink-0">
               <button type="button" onClick={() => setView('search')}
+                className="h-12 px-6 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-gray-50 transition">
+                กลับ
+              </button>
+              <div className="flex-1" />
+              <button type="button" onClick={() => setView('editItems')}
+                className="h-12 px-6 rounded-[12px] border border-sky-300 bg-sky-50 hover:bg-sky-100 text-sky-600 text-s2 font-semibold transition flex items-center gap-2">
+                <Pencil className="w-4 h-4" />
+                แก้ไขรายการ
+              </button>
+              <button type="button" onClick={handleCreateInvoice}
+                disabled={activeItems.length === 0}
+                className="h-12 px-8 rounded-[12px] text-s2 font-bold transition hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                style={{ backgroundColor: YELLOW, color: NAVY }}>
+                <CheckCircle2 className="w-4 h-4" />
+                สร้างใบแจ้งหนี้
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ══════════════ EDIT ITEMS VIEW (separate page — only items section) ══════════════ */}
+        {view === 'editItems' && selected && (
+          <>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+              <div className="text-s2 font-bold" style={{ color: NAVY }}>รายการสินค้า</div>
+
+              {/* Add SKU — stepper + search */}
+              <form onSubmit={handleAddSku} className="flex items-center gap-3">
+                <div className="flex items-center gap-2 shrink-0">
+                  <button type="button" onClick={() => setAddQty(q => Math.max(1, q - 1))}
+                    className="w-11 h-11 flex items-center justify-center rounded-[12px] bg-blue-100 border border-sky-200 text-sky-500 hover:brightness-95 transition text-h5 leading-none">
+                    −
+                  </button>
+                  <input
+                    type="text" inputMode="numeric" pattern="[0-9]*" value={addQty}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/[^0-9]/g, '');
+                      const v = raw ? parseInt(raw) : 1;
+                      setAddQty(Math.max(1, v));
+                    }}
+                    className="w-14 h-11 text-center border border-gray-300 rounded-[12px] text-s2 font-bold text-text-primary outline-none focus:border-sky-400 transition tabular-nums"
+                  />
+                  <button type="button" onClick={() => setAddQty(q => q + 1)}
+                    className="w-11 h-11 flex items-center justify-center rounded-[12px] bg-blue-100 border border-sky-200 text-sky-500 hover:brightness-95 transition text-h5 leading-none">
+                    +
+                  </button>
+                </div>
+                <div className="flex-1 relative">
+                  <div className="flex items-center gap-2 h-11 px-4 bg-white border border-gray-300 rounded-[12px] focus-within:border-sky-400 focus-within:border-2 transition">
+                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                    <input ref={addSkuRef} type="text" value={addSku}
+                      onChange={e => setAddSku(e.target.value)}
+                      placeholder="สแกนบาร์โค้ด หรือ ค้นหาด้วยชื่อสินค้า, SKU, รหัสบาร์โค้ด, แบรนด์"
+                      className="w-full text-b3 text-text-primary placeholder:text-gray-400 outline-none bg-transparent" />
+                  </div>
+                  {showSuggestions && (suggestLoading || suggestions.length > 0) && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[12px] shadow-xl z-30 max-h-[320px] overflow-y-auto">
+                      {suggestLoading && (
+                        <div className="px-4 py-3 text-c1 text-text-muted flex items-center gap-2">
+                          <RefreshCcw className="w-3.5 h-3.5 animate-spin" />
+                          กำลังค้นหา...
+                        </div>
+                      )}
+                      {!suggestLoading && suggestions.map(p => {
+                        const available = (p.stockOffline ?? 0) - (p.reservedOffline ?? 0);
+                        const out = available <= 0;
+                        return (
+                          <button key={p.sku} type="button"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => handleSuggestionPick(p)}
+                            disabled={out}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 transition border-b border-gray-100 last:border-b-0 text-left ${out ? 'opacity-60 cursor-not-allowed' : 'hover:bg-sky-50'}`}>
+                            <ProductThumb image={p.image} name={p.name} size={40} />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-b4 text-text-primary truncate">{p.name}</div>
+                              <div className="text-c2 text-text-muted font-mono">{p.sku}</div>
+                            </div>
+                            <div className="text-s1 font-bold tabular-nums shrink-0" style={{ color: NAVY }}>
+                              ฿{fmt(p.standardPrice)}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </form>
+
+              {/* Items table — same as review, but with delete column */}
+              <div className="rounded-[14px] border border-gray-200 overflow-hidden">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-100 border-b border-gray-200">
+                      <th className="text-left  px-3 py-3 text-s2 font-semibold text-text-secondary w-[140px] whitespace-nowrap">รหัสสินค้า</th>
+                      <th className="text-left  px-3 py-3 text-s2 font-semibold text-text-secondary whitespace-nowrap">รายการสินค้า</th>
+                      <th className="text-center px-3 py-3 text-s2 font-semibold text-text-secondary w-[100px] whitespace-nowrap">จำนวน</th>
+                      <th className="text-right  px-3 py-3 text-s2 font-semibold text-text-secondary w-[130px] whitespace-nowrap">ราคา/หน่วย</th>
+                      <th className="text-right  px-3 py-3 text-s2 font-semibold text-text-secondary w-[140px] whitespace-nowrap">รวม</th>
+                      <th className="px-3 py-3 w-[70px]" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editItems.map(item => (
+                      <tr key={item.sku} className={`border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors ${item.qty === 0 ? 'opacity-50' : ''}`}>
+                        <td className="px-3 py-3 align-middle text-c2 font-mono text-text-secondary">{item.sku}</td>
+                        <td className="px-3 py-3 align-middle">
+                          <div className="text-b4 text-text-primary leading-snug">{item.name}</div>
+                        </td>
+                        <td className="px-3 py-3 text-center align-middle">
+                          <div className="text-s2 text-text-primary tabular-nums">{item.qty}</div>
+                          <div className="text-c2 text-text-muted">/{item.unit}</div>
+                        </td>
+                        <td className="px-3 py-3 text-right align-middle">
+                          <div className="text-s2 font-bold tabular-nums" style={{ color: NAVY }}>{fmt(item.currentPrice)}</div>
+                          {item.currentPrice !== item.originalPrice && item.originalPrice > 0 && (
+                            <div className="text-c3 text-text-muted line-through tabular-nums">{fmt(item.originalPrice)}</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right align-middle text-s2 font-bold tabular-nums"
+                          style={{ color: item.qty > 0 ? NAVY : '#9CA3AF' }}>
+                          {item.qty > 0 ? fmt(item.qty * item.currentPrice) : '—'}
+                        </td>
+                        <td className="px-3 py-3 align-middle">
+                          <div className="flex items-center justify-center">
+                            <button type="button" onClick={() => setPendingDeleteSku(item.sku)}
+                              title="ลบรายการสินค้า (ต้องยืนยันโดยหัวหน้า)"
+                              className="w-10 h-10 rounded-[10px] bg-status-danger-bg text-status-danger hover:brightness-95 flex items-center justify-center transition">
+                              <Trash2 className="w-5 h-5" strokeWidth={2} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {editItems.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-12 text-center text-b3 text-text-muted">
+                          ยังไม่มีรายการสินค้า — สแกนหรือค้นหาเพื่อเพิ่ม
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  {activeItems.length > 0 && (
+                    <tfoot>
+                      <tr className="bg-gray-50 border-t-2 border-gray-200">
+                        <td colSpan={4} className="px-3 py-3.5 text-right text-b3 font-semibold text-text-secondary">ยอดสุทธิ</td>
+                        <td className="px-3 py-3.5 text-right text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
+                          ฿{fmt(invoiceTotal(activeItems))}
+                        </td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+
+              {/* Note — editable */}
+              <div>
+                <label className="text-c1 text-text-secondary mb-1.5 block">หมายเหตุ</label>
+                <textarea value={editNote} onChange={e => setEditNote(e.target.value)}
+                  rows={2} placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-[12px] text-b3 outline-none focus:border-sky-400 focus:border-2 transition resize-none bg-white" />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-bg-page flex items-center gap-3 shrink-0">
+              <button type="button" onClick={() => setView('edit')}
                 className="h-12 px-6 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-gray-50 transition">
                 กลับ
               </button>
@@ -874,6 +998,17 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
         )}
 
       </div>
+
+      {/* ── Supervisor auth — required to delete a line item ── */}
+      <SupervisorAuthDialog
+        open={pendingDeleteSku !== null}
+        mode="cancel-item"
+        onClose={() => setPendingDeleteSku(null)}
+        onConfirm={async () => {
+          if (pendingDeleteSku) removeItem(pendingDeleteSku);
+          setPendingDeleteSku(null);
+        }}
+      />
 
       {/* ── Confirmation popup before opening edit view ── */}
       {confirmOrder && (
