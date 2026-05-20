@@ -5,7 +5,7 @@ import {
   Truck, Store, Gift, Coins, Tag, Sparkles, TrendingUp,
   ChevronRight, Plus, AlertTriangle, UserCircle, Settings, Power,
   RefreshCw, Pause, Inbox, Ban, LayoutGrid, Crown, User, Package, X,
-  MapPin, Warehouse, Eye, Check, Phone, Box, ChevronDown, ChevronUp,
+  MapPin, Warehouse, Eye, Check, Phone, Box, ChevronDown, ChevronUp, Monitor,
   ShoppingCart, Pencil, Hourglass, Clock, CheckCircle2, Trophy, Ticket,
   BadgeCheck, FileText, Calendar, Save, Printer,
 } from 'lucide-react';
@@ -319,11 +319,12 @@ function WalkInCard({ onSearch: _onSearch, onRegister }: { onSearch: () => void;
   );
 }
 
-function CustomerCard({ customer, onClear: _onClear, cartTotal = 0, onApproveCredit }: {
+function CustomerCard({ customer, onClear: _onClear, cartTotal = 0, onApproveCredit, creditApprovalSubmitted = false }: {
   customer: Customer;
   onClear: () => void;
   cartTotal?: number;
   onApproveCredit?: () => void;
+  creditApprovalSubmitted?: boolean;
 }) {
   const credit = customer.creditLimit ?? 0;
   const used = customer.creditUsed ?? 0;
@@ -570,7 +571,7 @@ function CustomerCard({ customer, onClear: _onClear, cartTotal = 0, onApproveCre
             </div>
 
           {/* Over-limit warning — cart total exceeds remaining credit */}
-          {isOverLimit && (
+          {isOverLimit && !creditApprovalSubmitted && (
             <>
               <div className="mt-3 rounded-[10px] border border-red-200 bg-red-50 px-3 py-3">
                 <div className="text-c1 font-bold text-red-600 mb-2">ยอดสั่งซื้อเกินวงเงินเครดิตคงเหลือ</div>
@@ -598,6 +599,18 @@ function CustomerCard({ customer, onClear: _onClear, cartTotal = 0, onApproveCre
                 อนุมัติ
               </button>
             </>
+          )}
+
+          {/* Approval submitted state — request is pending; checkout is unblocked */}
+          {isOverLimit && creditApprovalSubmitted && (
+            <div className="mt-3 rounded-[10px] border border-green-200 bg-green-50 px-3 py-3">
+              <div className="flex items-center gap-1.5 text-c1 font-bold text-green-700 mb-1">
+                <Check className="w-4 h-4" /> ส่งคำขออนุมัติวงเงินแล้ว
+              </div>
+              <div className="text-c2 text-text-secondary">
+                สามารถสั่งซื้อต่อได้ — รอผู้มีอำนาจพิจารณา
+              </div>
+            </div>
           )}
           </div>
         </div>
@@ -649,6 +662,9 @@ export default function POSScreen() {
   const [showCartPending, setShowCartPending] = useState(false);
   const [supervisorAuth, setSupervisorAuth] = useState<{ mode: SupervisorAuthMode; targetSku?: string } | null>(null);
   const [showCreditApproval, setShowCreditApproval] = useState(false);
+  /** Tracks whether the staff has submitted a temporary credit approval request for the current cart.
+   * Allows the over-limit cart to proceed to checkout. Reset on customer change or cart clear. */
+  const [creditApprovalSubmitted, setCreditApprovalSubmitted] = useState(false);
   /** Per-line fulfillment: 'pickup' (รับเองหน้าร้าน) | 'delivery' (จัดส่ง). Default 'pickup'. */
   const [fulfillmentMap, setFulfillmentMap] = useState<Record<string, 'pickup' | 'delivery'>>({});
   const [showFulfillmentConfirm, setShowFulfillmentConfirm] = useState(false);
@@ -766,6 +782,11 @@ export default function POSScreen() {
     const id = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  // Reset credit-approval flag when customer changes or cart is emptied.
+  useEffect(() => {
+    if (!customer || cartItems.length === 0) setCreditApprovalSubmitted(false);
+  }, [customer, cartItems.length]);
 
   // Close settings dropdown on outside click / Escape
   useEffect(() => {
@@ -1411,14 +1432,34 @@ export default function POSScreen() {
   broadcastToDisplayRef.current = () => {
     const ch = displayChannelRef.current;
     if (!ch) return;
-    if (cartItems.length === 0) {
+    // Send idle only when cart is empty AND no customer selected
+    if (cartItems.length === 0 && !customer) {
       ch.postMessage({ type: 'idle' } satisfies DisplayMessage);
       return;
     }
+    // Combine buy-X-get-Y, order gifts, brand promos, and redeemed rewards into one list
+    const freeItems = [
+      ...Array.from(buygetFreeBySku.values()).map(row => ({
+        sku:   row.id,
+        name:  row.name,
+        image: row.image,
+        qty:   row.qty,
+        unit:  row.unit,
+      })),
+      ...otherFreeRows.map(row => ({
+        sku:   row.id,
+        name:  row.name,
+        image: row.image,
+        qty:   row.qty,
+        unit:  row.unit,
+      })),
+    ];
+
     ch.postMessage({
       type: 'cart-update',
       items: cartItems.map(item => {
         const product = productMap.get(item.sku);
+        const tagLabels = getMockPromoTags(product?.brand).map(t => t.label);
         return {
           sku: item.sku,
           name: product?.name ?? item.sku,
@@ -1427,6 +1468,7 @@ export default function POSScreen() {
           qty: item.qty,
           unitPrice: parseFloat(item.unitPrice),
           lineTotal: parseFloat(item.unitPrice) * item.qty,
+          promotionTags: tagLabels.length > 0 ? tagLabels : undefined,
         };
       }),
       subtotal: totals.subtotal,
@@ -1435,6 +1477,10 @@ export default function POSScreen() {
       lastScannedSku: lastScannedSkuRef.current ?? undefined,
       cashier: me?.name ?? undefined,
       customerName: customer?.name ?? undefined,
+      memberId: customer?.code ?? undefined,
+      memberLevel: customer ? (TIER_MAP[customer.tier]?.label ?? customer.tier) : undefined,
+      memberTier: customer?.priceTier ?? undefined,
+      freeItems: freeItems.length > 0 ? freeItems : undefined,
     } satisfies DisplayMessage);
   };
 
@@ -1449,7 +1495,7 @@ export default function POSScreen() {
       if (broadcastDebounceRef.current) clearTimeout(broadcastDebounceRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartItems, totals, customer, me, productMap]);
+  }, [cartItems, totals, customer, me, productMap, buygetFreeBySku, otherFreeRows]);
 
   const time = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
   const dateLabel = now.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -1509,7 +1555,12 @@ export default function POSScreen() {
       <CreditApprovalDialog
         open={showCreditApproval}
         onClose={() => setShowCreditApproval(false)}
-        onConfirm={() => { setShowCreditApproval(false); }}
+        onConfirm={() => {
+          // Mark the request as submitted so checkout is unblocked even though
+          // cart still exceeds the customer's remaining credit limit.
+          setCreditApprovalSubmitted(true);
+          setShowCreditApproval(false);
+        }}
         customerName={customer?.name ?? ''}
         customerCode={customer?.code ?? ''}
         remaining={(customer?.creditLimit ?? 0) - (customer?.creditUsed ?? 0)}
@@ -1966,6 +2017,7 @@ export default function POSScreen() {
         onRegistered={c => { setCustomer(c); setShowRegister(false); }} />
 
       <PaymentDialog open={showPayment} onClose={() => setShowPayment(false)} totalAmount={totals.grand} customer={customer}
+        creditApprovalSubmitted={creditApprovalSubmitted}
         onConfirm={(method: 'cash' | 'card' | 'credit' | 'qr') => { setShowPayment(false); handlePaymentConfirm(method); }} />
 
       <CancelBillDialog open={showCancel} billId={billId} onClose={() => setShowCancel(false)}
@@ -2083,21 +2135,21 @@ export default function POSScreen() {
               >
                 <button
                   role="menuitem"
+                  onClick={() => { setShowSettingsMenu(false); window.open('/display', '_blank'); }}
+                  className="w-full flex items-center gap-3 px-5 h-12 text-s2 transition hover:bg-bg-page-2"
+                  style={{ color: NAVY }}
+                >
+                  <Monitor className="w-5 h-5 shrink-0" />
+                  จอแสดงผลลูกค้า
+                </button>
+                <button
+                  role="menuitem"
                   onClick={() => { setShowSettingsMenu(false); setShowChangePassword(true); }}
                   className="w-full flex items-center gap-3 px-5 h-12 text-s2 transition hover:bg-bg-page-2"
                   style={{ color: NAVY }}
                 >
                   <Eye className="w-5 h-5 shrink-0" />
                   เปลี่ยนรหัสผ่าน
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => { setShowSettingsMenu(false); window.open('/display', '_blank'); }}
-                  className="w-full flex items-center gap-3 px-5 h-12 text-s2 transition hover:bg-bg-page-2"
-                  style={{ color: NAVY }}
-                >
-                  <MapPin className="w-5 h-5 shrink-0" />
-                  จอแสดงผลลูกค้า
                 </button>
                 <div className="mx-4 h-px bg-gray-100" />
                 <button
@@ -2653,6 +2705,7 @@ export default function POSScreen() {
                 onClear={() => setCustomer(null)}
                 cartTotal={totals.grand}
                 onApproveCredit={() => setShowCreditApproval(true)}
+                creditApprovalSubmitted={creditApprovalSubmitted}
               />
             ) : (
               <WalkInCard onSearch={() => { setCustomerSearchMode('search'); setShowCustomerSearch(true); }} onRegister={() => setShowRegister(true)} />

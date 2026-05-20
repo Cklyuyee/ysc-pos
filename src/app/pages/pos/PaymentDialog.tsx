@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   X, Banknote, CreditCard, QrCode, Building2,
-  Check, AlertTriangle, ChevronRight, ArrowRight,
+  Check, CheckCircle2, AlertTriangle, ChevronRight, ArrowRight,
 } from 'lucide-react';
 import type { Customer } from '../../../data/customers';
 
@@ -55,9 +55,12 @@ interface Props {
   onConfirm: (method: PayMethod, received?: number) => void;
   totalAmount: number;
   customer: Customer | null;
+  /** When true, allow credit payment even if remaining < totalAmount
+   *  (temporary credit approval request has been submitted). */
+  creditApprovalSubmitted?: boolean;
 }
 
-export function PaymentDialog({ open, onClose, onConfirm, totalAmount, customer }: Props) {
+export function PaymentDialog({ open, onClose, onConfirm, totalAmount, customer, creditApprovalSubmitted = false }: Props) {
   const [method, setMethod] = useState<PayMethod>('cash');
   const [cashReceived, setCashReceived] = useState('');
   const [done, setDone] = useState(false);
@@ -66,7 +69,7 @@ export function PaymentDialog({ open, onClose, onConfirm, totalAmount, customer 
   const creditRemaining = customer
     ? Math.max(0, (customer.creditLimit ?? 0) - (customer.creditUsed ?? 0))
     : 0;
-  const creditInsufficient = method === 'credit' && creditRemaining < totalAmount;
+  const creditInsufficient = method === 'credit' && creditRemaining < totalAmount && !creditApprovalSubmitted;
 
   useEffect(() => {
     if (!open) return;
@@ -205,37 +208,52 @@ export function PaymentDialog({ open, onClose, onConfirm, totalAmount, customer 
             </div>
           )}
 
-          {method === 'credit' && (
-            <div className="flex flex-col gap-3">
-              <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 flex items-center justify-between">
-                <div>
-                  <div className="text-c3 text-neutral-500 font-medium">วงเงินคงเหลือ</div>
-                  <div className={`text-h5 font-extrabold tabular-nums mt-0.5 ${creditInsufficient ? 'text-rose-600' : 'text-emerald-600'}`}>
-                    {fmt(creditRemaining)}
-                  </div>
-                  <div className="text-[11px] text-neutral-400 mt-0.5">วงเงินทั้งหมด {fmt(customer?.creditLimit ?? 0)}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-c3 text-neutral-500 font-medium">ยอดที่จะตัด</div>
-                  <div className="text-b3 font-bold text-neutral-900 tabular-nums mt-0.5">{fmt(totalAmount)}</div>
-                  {!creditInsufficient && (
-                    <div className="text-[11px] text-emerald-600 mt-0.5">คงเหลือ {fmt(creditRemaining - totalAmount)}</div>
-                  )}
-                </div>
-              </div>
-              {creditInsufficient && (
-                <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-                  <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+          {method === 'credit' && (() => {
+            const wouldExceed = creditRemaining < totalAmount;
+            const usingTempApproval = wouldExceed && creditApprovalSubmitted;
+            return (
+              <div className="flex flex-col gap-3">
+                <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 flex items-center justify-between">
                   <div>
-                    <div className="text-c3 font-bold text-rose-700">วงเงินไม่เพียงพอ</div>
-                    <div className="text-c3 text-rose-600 mt-0.5">
-                      ขาดอีก {fmt(totalAmount - creditRemaining)} — กรุณาเลือกวิธีชำระอื่น หรือลดยอดในบิล
+                    <div className="text-c3 text-neutral-500 font-medium">วงเงินคงเหลือ</div>
+                    <div className={`text-h5 font-extrabold tabular-nums mt-0.5 ${creditInsufficient ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {fmt(creditRemaining)}
+                    </div>
+                    <div className="text-[11px] text-neutral-400 mt-0.5">วงเงินทั้งหมด {fmt(customer?.creditLimit ?? 0)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-c3 text-neutral-500 font-medium">ยอดที่จะตัด</div>
+                    <div className="text-b3 font-bold text-neutral-900 tabular-nums mt-0.5">{fmt(totalAmount)}</div>
+                    {!wouldExceed && (
+                      <div className="text-[11px] text-emerald-600 mt-0.5">คงเหลือ {fmt(creditRemaining - totalAmount)}</div>
+                    )}
+                  </div>
+                </div>
+                {creditInsufficient && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                    <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-c3 font-bold text-rose-700">วงเงินไม่เพียงพอ</div>
+                      <div className="text-c3 text-rose-600 mt-0.5">
+                        ขาดอีก {fmt(totalAmount - creditRemaining)} — กรุณาเลือกวิธีชำระอื่น หรือลดยอดในบิล
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+                {usingTempApproval && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-c3 font-bold text-emerald-700">ส่งคำขออนุมัติวงเงินชั่วคราวแล้ว</div>
+                      <div className="text-c3 text-emerald-700 mt-0.5">
+                        ยอดเกินวงเงิน {fmt(totalAmount - creditRemaining)} — รอผู้มีอำนาจพิจารณา สามารถยืนยันชำระเงินได้
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {method === 'qr' && (
             <div className="flex flex-col gap-3">

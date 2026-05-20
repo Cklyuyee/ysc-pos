@@ -13,6 +13,18 @@ export interface DisplayCartItem {
   qty: number
   unitPrice: number
   lineTotal: number
+  /** Discount applied to this line (0 if none) */
+  lineDiscount?: number
+  /** Promo tag labels shown under product name e.g. ["ซื้อ 1 แถม 1", "ได้รับโปรแบรนด์"] */
+  promotionTags?: string[]
+}
+
+export interface DisplayFreeItem {
+  sku: string
+  name: string
+  image?: string
+  qty: number
+  unit: string
 }
 
 export interface DisplayCartState {
@@ -27,6 +39,18 @@ export interface DisplayCartState {
   cashier?: string
   /** customer name if selected */
   customerName?: string
+  /** member ID e.g. "C2024001" */
+  memberId?: string
+  /** membership level e.g. "Gold Member" */
+  memberLevel?: string
+  /** tier code e.g. "P3" */
+  memberTier?: string
+  /** promo/campaign discount total (for breakdown display) */
+  promoDiscount?: number
+  /** bill-end discount total */
+  billDiscount?: number
+  /** free / gift items earned on this bill */
+  freeItems?: DisplayFreeItem[]
 }
 
 export interface DisplayIdleState {
