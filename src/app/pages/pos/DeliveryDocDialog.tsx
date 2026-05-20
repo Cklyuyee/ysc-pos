@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  X, FileSearch, Search, Printer, Pencil, ChevronLeft,
-  Trash2, Plus, Minus, FileText, CheckCircle2, Clock,
-  Package, User, Calendar, Hash, MapPin,
+  X, FileSearch, Search, Printer, Pencil,
+  Trash2, FileText, CheckCircle2,
+  User, Calendar, Hash, MapPin, CalendarDays,
 } from 'lucide-react';
+import { searchProducts, ApiProduct } from '../../../services/productsApi';
+import { ProductThumb } from '../../components/ui/ProductThumb';
+import { SupervisorAuthDialog } from './SupervisorAuthDialog';
 
 const NAVY = '#0B1E8A';
 const YELLOW = '#FFC518';
@@ -27,6 +30,7 @@ interface DeliveryDoc {
   address: string;
   status: 'pending' | 'shipped' | 'delivered' | 'cancelled';
   items: DocItem[];
+  createdBy: string;
   note?: string;
 }
 
@@ -63,6 +67,7 @@ const MOCK_DOCS: DeliveryDoc[] = [
       { sku: 'PAP-A4-500', name: 'กระดาษ A4 Double A 80g (1 รีม)', qty: 5, unit: 'รีม', unitPrice: 145 },
       { sku: 'FILE-ARCH', name: 'แฟ้มอาร์ช 2 นิ้ว สีดำ', qty: 10, unit: 'อัน', unitPrice: 65 },
     ],
+    createdBy: 'somchai',
     note: 'จัดส่งก่อนเที่ยง',
   },
   {
@@ -73,6 +78,7 @@ const MOCK_DOCS: DeliveryDoc[] = [
     date: '2026-05-18',
     address: '55 ถ.พหลโยธิน แขวงลาดยาว เขตจตุจักร กรุงเทพฯ 10900',
     status: 'shipped',
+    createdBy: 'wanna',
     items: [
       { sku: 'NB-A5-LINE', name: 'สมุดโน้ต A5 เส้นบรรทัด 80 แผ่น', qty: 50, unit: 'เล่ม', unitPrice: 28 },
       { sku: 'RULER-30', name: 'ไม้บรรทัด 30 ซม. พลาสติก', qty: 30, unit: 'อัน', unitPrice: 15 },
@@ -87,6 +93,7 @@ const MOCK_DOCS: DeliveryDoc[] = [
     date: '2026-05-17',
     address: '8/12 ซ.ลาดพร้าว 101 เขตลาดพร้าว กรุงเทพฯ 10230',
     status: 'delivered',
+    createdBy: 'somchai',
     items: [
       { sku: 'STAMP-PAD-BK', name: 'แป้นประทับตรา Shiny สีดำ', qty: 2, unit: 'กล่อง', unitPrice: 95 },
       { sku: 'TAPE-OPP-1', name: 'เทปใส OPP 1 นิ้ว x 50 หลา', qty: 6, unit: 'ม้วน', unitPrice: 22 },
@@ -100,6 +107,7 @@ const MOCK_DOCS: DeliveryDoc[] = [
     date: '2026-05-15',
     address: '77/3 ถ.รัชดาภิเษก แขวงจตุจักร เขตจตุจักร กรุงเทพฯ 10900',
     status: 'cancelled',
+    createdBy: 'napat',
     items: [
       { sku: 'INK-HP-BK', name: 'หมึกพิมพ์ HP 680 สีดำ', qty: 3, unit: 'ตลับ', unitPrice: 285 },
     ],
@@ -113,6 +121,7 @@ const MOCK_DOCS: DeliveryDoc[] = [
     date: '2026-05-14',
     address: '22 ถ.นนทบุรี อ.เมือง นนทบุรี 11000',
     status: 'delivered',
+    createdBy: 'wanna',
     items: [
       { sku: 'CLIP-BINDER', name: 'คลิปดำ ขนาด 2 นิ้ว (12 ตัว/กล่อง)', qty: 5, unit: 'กล่อง', unitPrice: 35 },
       { sku: 'POST-IT-3x3', name: 'กระดาษโน้ต Post-it 3x3 นิ้ว สีเหลือง', qty: 10, unit: 'แพ็ค', unitPrice: 55 },
@@ -154,8 +163,16 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
   const [editItems, setEditItems] = useState<DocItem[]>([]);
   const [editNote, setEditNote] = useState('');
   const [addSku, setAddSku] = useState('');
+  const [addQty, setAddQty] = useState(1);
+  const [suggestions, setSuggestions] = useState<ApiProduct[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [pendingDeleteSku, setPendingDeleteSku] = useState<string | null>(null);
   const addSkuRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const dateFromRef = useRef<HTMLInputElement>(null);
+  const dateToRef = useRef<HTMLInputElement>(null);
+  const suggestDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // focus search on open
   useEffect(() => {
@@ -166,6 +183,33 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
   useEffect(() => {
     if (view === 'edit') setTimeout(() => addSkuRef.current?.focus(), 50);
   }, [view]);
+
+  // debounced product search for edit-view dropdown
+  useEffect(() => {
+    if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    const q = addSku.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setSuggestLoading(false);
+      return;
+    }
+    setSuggestLoading(true);
+    suggestDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await searchProducts(q);
+        setSuggestions(res.slice(0, 8));
+        setShowSuggestions(true);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSuggestLoading(false);
+      }
+    }, 250);
+    return () => {
+      if (suggestDebounceRef.current) clearTimeout(suggestDebounceRef.current);
+    };
+  }, [addSku]);
 
   if (!open) return null;
 
@@ -203,22 +247,46 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
   };
 
   // ── edit helpers ──
-  const changeQty = (sku: string, delta: number) => {
-    setEditItems(prev =>
-      prev.map(i => i.sku === sku ? { ...i, qty: Math.max(1, i.qty + delta) } : i)
-    );
-  };
   const removeEditItem = (sku: string) => setEditItems(prev => prev.filter(i => i.sku !== sku));
+  const confirmDelete = async (_creds: { username: string; password: string }) => {
+    // In production: validate supervisor credentials with backend before removing.
+    if (pendingDeleteSku) {
+      removeEditItem(pendingDeleteSku);
+    }
+    setPendingDeleteSku(null);
+  };
   const handleAddSku = (e: React.FormEvent) => {
     e.preventDefault();
     const s = addSku.trim().toUpperCase();
     if (!s) return;
     if (editItems.some(i => i.sku === s)) {
-      changeQty(s, 1);
+      setEditItems(prev => prev.map(i => i.sku === s ? { ...i, qty: i.qty + addQty } : i));
     } else {
-      setEditItems(prev => [...prev, { sku: s, name: `สินค้า ${s}`, qty: 1, unit: 'ชิ้น', unitPrice: 0 }]);
+      setEditItems(prev => [...prev, { sku: s, name: `สินค้า ${s}`, qty: addQty, unit: 'ชิ้น', unitPrice: 0 }]);
     }
     setAddSku('');
+    setAddQty(1);
+    addSkuRef.current?.focus();
+  };
+
+  const handleSuggestionPick = (product: ApiProduct) => {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    const sku = product.sku;
+    if (editItems.some(i => i.sku === sku)) {
+      setEditItems(prev => prev.map(i => i.sku === sku ? { ...i, qty: i.qty + addQty } : i));
+    } else {
+      setEditItems(prev => [...prev, {
+        sku,
+        name: product.name,
+        qty: addQty,
+        unit: product.unit,
+        unitPrice: product.standardPrice,
+      }]);
+    }
+    setAddSku('');
+    setAddQty(1);
+    addSkuRef.current?.focus();
   };
   const saveEdit = () => {
     // In production: call API to update the document
@@ -236,20 +304,11 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-[20px] shadow-2xl w-full max-w-[920px] mx-4 flex flex-col overflow-hidden" style={{ maxHeight: '88vh' }}>
+      <div className="relative bg-white rounded-[20px] shadow-2xl w-full max-w-[1280px] mx-4 flex flex-col overflow-hidden" style={{ maxHeight: '88vh' }}>
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 py-4 shrink-0" style={{ backgroundColor: NAVY }}>
           <div className="flex items-center gap-3">
-            {(view === 'detail' || view === 'edit') && (
-              <button
-                type="button"
-                onClick={() => setView(view === 'edit' ? 'detail' : 'search')}
-                className="w-8 h-8 rounded-full hover:bg-white/15 flex items-center justify-center transition"
-              >
-                <ChevronLeft className="w-4 h-4 text-white" />
-              </button>
-            )}
             <span className="text-h5 font-bold text-white">
               {view === 'search' && 'ค้นหา/พิมพ์/แก้ไขใบส่งสินค้า'}
               {view === 'detail' && `ใบส่งสินค้า ${selected?.docNumber}`}
@@ -273,76 +332,90 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
         {view === 'search' && (
           <>
             {/* Filter bar */}
-            <div className="px-6 pt-5 pb-4 border-b border-gray-100 shrink-0">
-              <div className="flex items-end gap-3">
-                {/* รหัสลูกค้า */}
-                <div className="flex-1">
+            {/* Filter — 3-col grid, both rows share same column widths */}
+            <div className="px-6 pt-5 pb-4 shrink-0">
+              <div className="grid grid-cols-3 gap-x-3 gap-y-3">
+
+                {/* Row 1 */}
+                <div className="min-w-0">
                   <label className="text-c1 text-text-secondary mb-1.5 block">รหัสลูกค้า</label>
-                  <div className="flex items-center gap-2 h-11 px-3 bg-white border-2 border-gray-200 rounded-[10px] focus-within:border-sky-400 transition">
+                  <div className="flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition">
                     <Search className="w-4 h-4 text-gray-400 shrink-0" />
                     <input ref={searchRef} type="text" value={custCode}
                       onChange={e => setCustCode(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleSearch()}
                       placeholder="เช่น C-0042"
-                      className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400" />
+                      className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400 min-w-0" />
                   </div>
                 </div>
-                {/* ชื่อลูกค้า */}
-                <div className="flex-1">
+                <div className="min-w-0">
                   <label className="text-c1 text-text-secondary mb-1.5 block">ชื่อลูกค้า</label>
-                  <div className="flex items-center gap-2 h-11 px-3 bg-white border-2 border-gray-200 rounded-[10px] focus-within:border-sky-400 transition">
+                  <div className="flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition">
                     <Search className="w-4 h-4 text-gray-400 shrink-0" />
                     <input type="text" value={custName}
                       onChange={e => setCustName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleSearch()}
                       placeholder="ชื่อลูกค้า"
-                      className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400" />
+                      className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400 min-w-0" />
                   </div>
                 </div>
-                {/* เลขที่ใบ */}
-                <div className="flex-1">
+                <div className="min-w-0">
                   <label className="text-c1 text-text-secondary mb-1.5 block">เลขที่ใบส่งสินค้า</label>
-                  <div className="flex items-center gap-2 h-11 px-3 bg-white border-2 border-gray-200 rounded-[10px] focus-within:border-sky-400 transition">
+                  <div className="flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition">
                     <Search className="w-4 h-4 text-gray-400 shrink-0" />
                     <input type="text" value={docNumber}
                       onChange={e => setDocNumber(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleSearch()}
                       placeholder="เช่น DLV-6804-00123"
-                      className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400" />
+                      className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400 min-w-0" />
                   </div>
                 </div>
-                {/* วันที่ */}
-                <div className="flex-1">
-                  <label className="text-c1 text-text-secondary mb-1.5 block">วันที่บิล — วันสิ้นสุดบิล</label>
-                  <div className="flex items-center gap-1.5 h-11 px-3 bg-white border-2 border-gray-200 rounded-[10px] focus-within:border-sky-400 transition">
-                    <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                      className="flex-1 text-b3 outline-none bg-transparent min-w-0" />
-                    <span className="text-gray-400 shrink-0">—</span>
-                    <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                      className="flex-1 text-b3 outline-none bg-transparent min-w-0" />
+
+                {/* Row 2 */}
+                <div className="min-w-0">
+                  <label className="text-c1 text-text-secondary mb-1.5 block">ตั้งแต่</label>
+                  <div className="flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition cursor-pointer"
+                    onClick={() => dateFromRef.current?.showPicker()}>
+                    <CalendarDays className="w-4 h-4 text-gray-400 shrink-0" />
+                    <input ref={dateFromRef} type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      className={`flex-1 text-b3 outline-none bg-transparent min-w-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden ${!dateFrom ? 'text-gray-400' : 'text-text-primary'}`} />
                   </div>
                 </div>
-                {/* ค้นหา */}
-                <button type="button" onClick={handleSearch}
-                  className="h-11 px-6 rounded-[10px] text-h5 font-bold transition hover:brightness-95 shrink-0 flex items-center gap-2"
-                  style={{ backgroundColor: YELLOW, color: NAVY }}>
-                  <Search className="w-4 h-4" />ค้นหา
-                </button>
+                <div className="min-w-0">
+                  <label className="text-c1 text-text-secondary mb-1.5 block">ถึงวันที่</label>
+                  <div className="flex items-center gap-2 h-11 px-3 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition cursor-pointer"
+                    onClick={() => dateToRef.current?.showPicker()}>
+                    <CalendarDays className="w-4 h-4 text-gray-400 shrink-0" />
+                    <input ref={dateToRef} type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      className={`flex-1 text-b3 outline-none bg-transparent min-w-0 cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden ${!dateTo ? 'text-gray-400' : 'text-text-primary'}`} />
+                  </div>
+                </div>
+                {/* Row 2 col 3: buttons right-aligned */}
+                <div className="flex items-end justify-end gap-3">
+                  {hasFilter && (
+                    <button type="button" onClick={handleReset}
+                      className="h-11 px-3 text-c1 text-sky-500 hover:text-sky-700 hover:underline transition whitespace-nowrap">
+                      ล้างการค้นหา
+                    </button>
+                  )}
+                  <button type="button" onClick={handleSearch}
+                    className="h-11 px-8 rounded-[10px] text-h5 font-bold transition hover:brightness-95 flex items-center gap-2 whitespace-nowrap"
+                    style={{ backgroundColor: YELLOW, color: NAVY }}>
+                    <Search className="w-4 h-4" />ค้นหา
+                  </button>
+                </div>
+
               </div>
             </div>
 
             {/* Results area */}
-            <div className="flex-1 overflow-y-auto px-6 pt-5 pb-2">
+            <div className="flex-1 overflow-y-auto px-6 pt-4 pb-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-s2 font-bold text-text-primary">ผลการค้นหา</span>
+                <span className="font-normal" style={{ color: '#6D717F', fontSize: '18px' }}>ผลการค้นหา</span>
                 {results !== null && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-c1 text-text-muted">พบ {results.length} รายการ</span>
-                    {hasFilter && (
-                      <button type="button" onClick={handleReset}
-                        className="text-c1 text-sky-500 hover:underline">ล้างการค้นหา</button>
-                    )}
-                  </div>
+                  <span className="text-c1 text-text-muted">พบ {results.length} รายการ</span>
                 )}
               </div>
 
@@ -367,16 +440,17 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
 
                 {/* Results table */}
                 {results !== null && results.length > 0 && (
-                  <table className="w-full">
+                  <table className="w-full text-c1">
                     <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
                       <tr>
-                        <th className="text-left px-5 py-3 text-c1 text-text-secondary font-semibold">เลขที่ใบ</th>
-                        <th className="text-left px-5 py-3 text-c1 text-text-secondary font-semibold">ชื่อลูกค้า</th>
-                        <th className="text-center px-4 py-3 text-c1 text-text-secondary font-semibold">วันที่</th>
-                        <th className="text-center px-4 py-3 text-c1 text-text-secondary font-semibold">รายการ</th>
-                        <th className="text-right px-5 py-3 text-c1 text-text-secondary font-semibold">ยอดสุทธิ</th>
-                        <th className="text-center px-4 py-3 text-c1 text-text-secondary font-semibold">สถานะ</th>
-                        <th className="px-4 py-3" />
+                        <th className="text-left px-4 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">เลขที่ใบ</th>
+                        <th className="text-center px-3 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">วันที่</th>
+                        <th className="text-left px-3 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">รหัสลูกค้า</th>
+                        <th className="text-left px-3 py-2.5 text-c1 text-text-secondary font-semibold">ชื่อลูกค้า</th>
+                        <th className="text-right px-4 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">ยอดสุทธิ</th>
+                        <th className="text-center px-3 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">ผู้ทำรายการ</th>
+                        <th className="text-center px-3 py-2.5 text-c1 text-text-secondary font-semibold whitespace-nowrap">สถานะ</th>
+                        <th className="px-3 py-2.5" />
                       </tr>
                     </thead>
                     <tbody>
@@ -384,45 +458,44 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                         <tr key={doc.id}
                           className={`border-b border-gray-100 last:border-b-0 hover:bg-sky-50 cursor-pointer transition-colors ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
                           onClick={() => openDetail(doc)}>
-                          <td className="px-5 py-3.5">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-sky-400 shrink-0" />
-                              <span className="text-b2 font-mono font-bold text-text-primary">{doc.docNumber}</span>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5">
+                              <FileText className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                              <span className="font-mono font-bold text-text-primary whitespace-nowrap">{doc.docNumber}</span>
                             </div>
                           </td>
-                          <td className="px-5 py-3.5">
-                            <div className="text-b2 text-text-primary">{doc.customer}</div>
-                            <div className="text-c2 text-text-muted">{doc.customerId}</div>
-                          </td>
-                          <td className="px-4 py-3.5 text-center text-b3 text-text-secondary whitespace-nowrap">
+                          <td className="px-3 py-3 text-center text-text-secondary whitespace-nowrap">
                             {fmtDate(doc.date)}
                           </td>
-                          <td className="px-4 py-3.5 text-center">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-c2 text-text-secondary">
-                              <Package className="w-3 h-3" />
-                              {doc.items.length} รายการ
-                            </span>
+                          <td className="px-3 py-3 text-text-secondary whitespace-nowrap">
+                            {doc.customerId}
                           </td>
-                          <td className="px-5 py-3.5 text-right">
-                            <span className="text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
+                          <td className="px-3 py-3 text-text-primary">
+                            {doc.customer}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="font-bold tabular-nums whitespace-nowrap" style={{ color: NAVY }}>
                               ฿{fmt(docTotal(doc.items))}
                             </span>
                           </td>
-                          <td className="px-4 py-3.5 text-center">
-                            <span className="inline-block px-2.5 py-1 rounded-[8px] text-c2 font-bold whitespace-nowrap"
+                          <td className="px-3 py-3 text-center text-text-secondary">
+                            {doc.createdBy}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className="inline-block px-2 py-0.5 rounded-[6px] font-semibold whitespace-nowrap"
                               style={{ backgroundColor: STATUS_BG[doc.status], color: STATUS_COLOR[doc.status] }}>
                               {STATUS_LABEL[doc.status]}
                             </span>
                           </td>
-                          <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                          <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                             <div className="flex items-center gap-2 justify-end">
                               <button type="button" title="พิมพ์ใบส่งสินค้า" onClick={() => handlePrint(doc)}
-                                className="w-8 h-8 rounded-[8px] flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-text-primary transition">
+                                className="w-9 h-9 rounded-[8px] flex items-center justify-center border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 hover:text-text-primary transition">
                                 <Printer className="w-4 h-4" />
                               </button>
                               {doc.status === 'pending' && (
                                 <button type="button" title="แก้ไขรายการ" onClick={() => openEdit(doc)}
-                                  className="w-8 h-8 rounded-[8px] flex items-center justify-center border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-500 transition">
+                                  className="w-9 h-9 rounded-[8px] flex items-center justify-center border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-500 transition">
                                   <Pencil className="w-4 h-4" />
                                 </button>
                               )}
@@ -436,77 +509,85 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 bg-bg-page shrink-0">
-              <button type="button" onClick={onClose}
-                className="w-full h-11 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-secondary hover:bg-gray-50 transition">
-                ปิด (Esc)
-              </button>
-            </div>
           </>
         )}
 
         {/* ══════════════ DETAIL VIEW ══════════════ */}
         {view === 'detail' && selected && (
           <>
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 
-              {/* Doc info grid */}
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { icon: Hash, label: 'เลขที่ใบส่งสินค้า', value: selected.docNumber },
-                  { icon: User, label: 'ลูกค้า', value: `${selected.customer} (${selected.customerId})` },
-                  { icon: Calendar, label: 'วันที่', value: fmtDate(selected.date) },
-                  { icon: Clock, label: 'สถานะ', value: STATUS_LABEL[selected.status], color: STATUS_COLOR[selected.status] },
-                ].map(row => (
-                  <div key={row.label} className="rounded-[12px] bg-gray-50 border border-gray-200 px-4 py-3 flex items-start gap-3">
-                    <row.icon className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
-                    <div>
-                      <div className="text-c2 text-text-muted">{row.label}</div>
-                      <div className="text-b2 font-bold" style={{ color: row.color ?? '#111827' }}>{row.value}</div>
+              {/* Info strip — single card, 4 equal columns */}
+              <div className="rounded-[14px] border border-gray-200 overflow-hidden">
+                <div className="grid grid-cols-4 divide-x divide-gray-200">
+                  {([
+                    { icon: Hash,     label: 'เลขที่ใบส่งสินค้า', value: selected.docNumber,              mono: true },
+                    { icon: User,     label: 'ลูกค้า',             value: selected.customer,               sub: selected.customerId },
+                    { icon: Calendar, label: 'วันที่',              value: fmtDate(selected.date) },
+                    { icon: User,     label: 'ผู้ทำรายการ',         value: selected.createdBy },
+                  ] as const).map(row => (
+                    <div key={row.label} className="px-5 py-4">
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <row.icon className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span className="text-c1 text-text-muted">{row.label}</span>
+                      </div>
+                      <div className={`text-b3 font-semibold text-text-primary ${'mono' in row && row.mono ? 'font-mono' : ''}`}>
+                        {row.value}
+                      </div>
+                      {'sub' in row && row.sub && (
+                        <div className="text-c2 text-text-muted mt-0.5">{row.sub}</div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
               {/* Address */}
-              <div className="rounded-[12px] bg-sky-50 border border-sky-200 px-4 py-3 flex items-start gap-3">
-                <MapPin className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
+              <div className="rounded-[14px] bg-sky-50 border border-sky-100 px-5 py-4 flex items-start gap-3">
+                <MapPin className="w-4 h-4 text-sky-500 mt-0.5 shrink-0" />
                 <div>
-                  <div className="text-c2 text-sky-600 mb-0.5">ที่อยู่จัดส่ง</div>
-                  <div className="text-b2 text-text-primary">{selected.address}</div>
+                  <div className="text-c1 text-sky-600 font-medium mb-1">ที่อยู่จัดส่ง</div>
+                  <div className="text-b3 text-text-primary leading-relaxed">{selected.address}</div>
                 </div>
               </div>
+
+              {/* Note */}
+              {selected.note && (
+                <div className="rounded-[14px] bg-amber-50 border border-amber-100 px-5 py-4 flex items-start gap-3">
+                  <span className="text-c1 font-semibold text-amber-700 shrink-0">หมายเหตุ:</span>
+                  <span className="text-b3 text-amber-800">{selected.note}</span>
+                </div>
+              )}
 
               {/* Items table */}
               <div>
                 <div className="text-s2 font-bold mb-3" style={{ color: NAVY }}>รายการสินค้า</div>
-                <div className="rounded-[12px] border border-gray-200 overflow-hidden">
+                <div className="rounded-[14px] border border-gray-200 overflow-hidden">
                   <table className="w-full">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left px-4 py-3 text-c1 text-text-secondary">#</th>
-                        <th className="text-left px-4 py-3 text-c1 text-text-secondary">รหัส / ชื่อสินค้า</th>
-                        <th className="text-right px-4 py-3 text-c1 text-text-secondary">จำนวน</th>
-                        <th className="text-right px-4 py-3 text-c1 text-text-secondary">ราคา/หน่วย</th>
-                        <th className="text-right px-4 py-3 text-c1 text-text-secondary">รวม</th>
+                      <tr className="bg-gray-100 border-b border-gray-200">
+                        <th className="text-left px-4 py-3 text-s2 font-semibold text-text-secondary w-10">#</th>
+                        <th className="text-left px-4 py-3 text-s2 font-semibold text-text-secondary">รหัส / ชื่อสินค้า</th>
+                        <th className="text-right px-4 py-3 text-s2 font-semibold text-text-secondary">จำนวน</th>
+                        <th className="text-right px-4 py-3 text-s2 font-semibold text-text-secondary">ราคา/หน่วย</th>
+                        <th className="text-right px-4 py-3 text-s2 font-semibold text-text-secondary">รวม</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selected.items.map((item, i) => (
-                        <tr key={item.sku} className="border-b border-gray-100 last:border-b-0">
-                          <td className="px-4 py-3 text-c2 text-text-muted">{i + 1}</td>
-                          <td className="px-4 py-3">
-                            <div className="text-b2 text-text-primary">{item.name}</div>
-                            <div className="text-c2 text-text-muted font-mono">{item.sku}</div>
+                        <tr key={item.sku} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3.5 text-c1 text-text-muted">{i + 1}</td>
+                          <td className="px-4 py-3.5">
+                            <div className="text-b3 font-medium text-text-primary">{item.name}</div>
+                            <div className="text-c2 text-text-muted font-mono mt-0.5">{item.sku}</div>
                           </td>
-                          <td className="px-4 py-3 text-right text-b2 tabular-nums">
+                          <td className="px-4 py-3.5 text-right text-b3 tabular-nums text-text-secondary whitespace-nowrap">
                             {item.qty.toLocaleString()} {item.unit}
                           </td>
-                          <td className="px-4 py-3 text-right text-b2 tabular-nums text-text-secondary">
+                          <td className="px-4 py-3.5 text-right text-b3 tabular-nums text-text-secondary">
                             ฿{fmt(item.unitPrice)}
                           </td>
-                          <td className="px-4 py-3 text-right text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
+                          <td className="px-4 py-3.5 text-right text-b3 font-bold tabular-nums" style={{ color: NAVY }}>
                             ฿{fmt(item.qty * item.unitPrice)}
                           </td>
                         </tr>
@@ -514,10 +595,10 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                     </tbody>
                     <tfoot>
                       <tr className="bg-gray-50 border-t-2 border-gray-200">
-                        <td colSpan={4} className="px-4 py-3 text-right text-s2 font-bold text-text-primary">
+                        <td colSpan={4} className="px-4 py-3.5 text-right text-b3 font-semibold text-text-secondary">
                           ยอดสุทธิ
                         </td>
-                        <td className="px-4 py-3 text-right text-h5 font-bold tabular-nums" style={{ color: NAVY }}>
+                        <td className="px-4 py-3.5 text-right text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
                           ฿{fmt(docTotal(selected.items))}
                         </td>
                       </tr>
@@ -526,22 +607,15 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                 </div>
               </div>
 
-              {/* Note */}
-              {selected.note && (
-                <div className="rounded-[12px] bg-amber-50 border border-amber-200 px-4 py-3 text-b2 text-amber-800">
-                  <span className="font-bold">หมายเหตุ:</span> {selected.note}
-                </div>
-              )}
             </div>
 
             {/* Footer actions */}
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3 shrink-0">
+            <div className="px-6 py-4 border-t border-gray-200 bg-bg-page flex items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setView('search')}
-                className="h-12 px-5 rounded-[12px] border border-gray-300 text-c1 text-text-secondary hover:bg-gray-50 transition flex items-center gap-2"
+                className="h-12 px-6 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-gray-50 transition"
               >
-                <ChevronLeft className="w-4 h-4" />
                 กลับ
               </button>
               <div className="flex-1" />
@@ -549,7 +623,7 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                 <button
                   type="button"
                   onClick={() => openEdit(selected)}
-                  className="h-12 px-6 rounded-[12px] border-2 border-sky-300 bg-sky-50 text-s2 text-sky-700 hover:bg-sky-100 transition flex items-center gap-2"
+                  className="h-12 px-6 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-gray-50 transition flex items-center gap-2"
                 >
                   <Pencil className="w-4 h-4" />
                   แก้ไขรายการ
@@ -571,83 +645,154 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
         {/* ══════════════ EDIT VIEW ══════════════ */}
         {view === 'edit' && selected && (
           <>
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
 
               {/* Add SKU */}
-              <div className="rounded-[14px] bg-sky-50 border border-sky-200 p-4">
-                <div className="text-s2 font-bold text-sky-700 mb-3">เพิ่มสินค้า</div>
-                <form onSubmit={handleAddSku} className="flex gap-3">
-                  <div className="flex-1 flex items-center gap-2 h-11 px-4 bg-white border-2 border-sky-300 rounded-[10px] focus-within:border-sky-500 transition">
-                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
+              <div>
+                <div className="text-s2 font-bold mb-3" style={{ color: NAVY }}>รายการสินค้า</div>
+                <form onSubmit={handleAddSku} className="flex items-center gap-3">
+                  {/* Qty stepper — matches main POS screen */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" onClick={() => setAddQty(q => Math.max(1, q - 1))}
+                      className="w-11 h-11 flex items-center justify-center rounded-[12px] bg-blue-100 border border-sky-200 text-sky-500 hover:brightness-95 transition text-h5 leading-none">
+                      −
+                    </button>
                     <input
-                      ref={addSkuRef}
-                      type="text"
-                      value={addSku}
-                      onChange={e => setAddSku(e.target.value)}
-                      placeholder="สแกน / พิมพ์ รหัสสินค้า"
-                      className="flex-1 text-b2 outline-none bg-transparent placeholder:text-gray-400"
+                      type="text" inputMode="numeric" pattern="[0-9]*" value={addQty}
+                      onChange={e => {
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        const v = raw ? parseInt(raw) : 1;
+                        if (v >= 1 && v <= 9999) setAddQty(v);
+                      }}
+                      onFocus={e => e.target.select()}
+                      className="w-12 h-11 rounded-[12px] bg-white border border-sky-200 text-center text-c1 !font-extrabold text-text-primary outline-none tabular-nums focus:border-sky-400"
                     />
+                    <button type="button" onClick={() => setAddQty(q => q + 1)}
+                      className="w-11 h-11 flex items-center justify-center rounded-[12px] bg-blue-100 border border-sky-200 text-sky-500 hover:brightness-95 transition text-h5 leading-none">
+                      +
+                    </button>
                   </div>
-                  <button
-                    type="submit"
-                    className="h-11 px-5 rounded-[10px] text-s2 font-bold transition hover:brightness-95 flex items-center gap-1.5"
-                    style={{ backgroundColor: NAVY, color: 'white' }}
-                  >
-                    <Plus className="w-4 h-4" />
-                    เพิ่ม
-                  </button>
+                  {/* Search input with dropdown */}
+                  <div className="flex-1 relative">
+                    <div className="flex items-center gap-2 h-11 px-4 bg-white border border-gray-300 rounded-[10px] focus-within:border-sky-400 focus-within:border-2 transition">
+                      <Search className="w-4 h-4 text-gray-400 shrink-0" />
+                      <input
+                        ref={addSkuRef}
+                        type="text"
+                        value={addSku}
+                        onChange={e => setAddSku(e.target.value)}
+                        onFocus={() => addSku.trim().length >= 2 && suggestions.length > 0 && setShowSuggestions(true)}
+                        onBlur={() => { setTimeout(() => setShowSuggestions(false), 150); }}
+                        placeholder="สแกนบาร์โค้ด หรือ ค้นหาด้วยชื่อสินค้า, SKU, รหัสบาร์โค้ด, แบรนด์"
+                        className="flex-1 text-b3 outline-none bg-transparent placeholder:text-gray-400"
+                      />
+                      {suggestLoading && (
+                        <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                      )}
+                    </div>
+                    {/* Suggestions dropdown */}
+                    {showSuggestions && suggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-2 z-30 bg-white border border-gray-200 rounded-[12px] shadow-[var(--shadow-elev)] max-h-[480px] overflow-y-auto">
+                        <div className="px-5 py-3 bg-bg-page text-c1 text-text-secondary sticky top-0 z-10 border-b border-gray-100">
+                          ผลการค้นหา ({suggestions.length})
+                        </div>
+                        {suggestions.map(p => {
+                          const available = (p.stockOffline ?? 0) - (p.reservedOffline ?? 0);
+                          const out = available <= 0;
+                          return (
+                            <button
+                              key={p.sku}
+                              type="button"
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => handleSuggestionPick(p)}
+                              disabled={out}
+                              className={`w-full flex items-center gap-4 px-5 py-3.5 text-left transition border-b border-gray-100 last:border-b-0 ${out ? 'opacity-60 cursor-not-allowed' : 'hover:bg-bg-page-2'}`}
+                            >
+                              <ProductThumb image={p.image} name={p.name} size={56} />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-s2 text-text-primary truncate">{p.name}</div>
+                                <div className="flex items-center gap-4 mt-1 text-c1 text-text-secondary">
+                                  <span>รหัสสินค้า : <span className="font-mono">{p.sku}</span></span>
+                                  {p.barcode && (
+                                    <span>รหัสบาร์โค้ด : <span className="font-mono">{p.barcode}</span></span>
+                                  )}
+                                </div>
+                                {(p.brand || out) && (
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                    {p.brand && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 text-c3 font-semibold">
+                                        โปรแบรนด์ {p.brand}
+                                      </span>
+                                    )}
+                                    {out && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 text-c3 font-bold">
+                                        สินค้าหมด
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-s1 font-bold tabular-nums shrink-0" style={{ color: NAVY }}>
+                                ฿{fmt(p.standardPrice)}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </form>
               </div>
 
               {/* Edit items table */}
-              <div className="rounded-[12px] border border-gray-200 overflow-hidden">
+              <div className="rounded-[14px] border border-gray-200 overflow-hidden">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-3 text-c1 text-text-secondary">รหัส / ชื่อสินค้า</th>
-                      <th className="text-center px-4 py-3 text-c1 text-text-secondary">จำนวน</th>
-                      <th className="text-right px-4 py-3 text-c1 text-text-secondary">ราคา/หน่วย</th>
-                      <th className="text-right px-4 py-3 text-c1 text-text-secondary">รวม</th>
-                      <th className="px-3 py-3" />
+                    <tr className="bg-gray-100 border-b border-gray-200">
+                      <th className="text-left px-3 py-3 text-s2 font-semibold text-text-secondary w-[140px] whitespace-nowrap">รหัสสินค้า</th>
+                      <th className="text-left px-3 py-3 text-s2 font-semibold text-text-secondary whitespace-nowrap">รายการสินค้า</th>
+                      <th className="text-center px-3 py-3 text-s2 font-semibold text-text-secondary w-[100px] whitespace-nowrap">จำนวน</th>
+                      <th className="text-right px-3 py-3 text-s2 font-semibold text-text-secondary w-[130px] whitespace-nowrap">ราคา/หน่วย</th>
+                      <th className="text-right px-3 py-3 text-s2 font-semibold text-text-secondary w-[140px] whitespace-nowrap">รวม</th>
+                      <th className="px-3 py-3 w-[70px]" />
                     </tr>
                   </thead>
                   <tbody>
                     {editItems.map(item => (
-                      <tr key={item.sku} className="border-b border-gray-100 last:border-b-0">
-                        <td className="px-4 py-3">
-                          <div className="text-b2 text-text-primary">{item.name}</div>
-                          <div className="text-c2 text-text-muted font-mono">{item.sku}</div>
+                      <tr key={item.sku} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors">
+                        <td className="px-3 py-3 align-middle text-c2 font-mono text-text-secondary">
+                          {item.sku}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-center gap-2">
-                            <button type="button" onClick={() => changeQty(item.sku, -1)}
-                              className="w-8 h-8 rounded-[8px] border border-gray-300 bg-white hover:bg-gray-100 flex items-center justify-center transition">
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-                            <span className="w-10 text-center text-b2 font-bold tabular-nums">{item.qty}</span>
-                            <button type="button" onClick={() => changeQty(item.sku, 1)}
-                              className="w-8 h-8 rounded-[8px] border border-sky-300 bg-sky-50 hover:bg-sky-100 flex items-center justify-center transition text-sky-600">
-                              <Plus className="w-3.5 h-3.5" />
+                        <td className="px-3 py-3 align-middle">
+                          <div className="text-b4 text-text-primary leading-snug">{item.name}</div>
+                        </td>
+                        <td className="px-3 py-3 text-center align-middle">
+                          <div className="text-s2 text-text-primary tabular-nums">{item.qty}</div>
+                          <div className="text-c2 text-text-muted">/{item.unit}</div>
+                        </td>
+                        <td className="px-3 py-3 text-right align-middle text-s2 tabular-nums text-text-primary">
+                          {fmt(item.unitPrice)}
+                        </td>
+                        <td className="px-3 py-3 text-right align-middle text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
+                          {fmt(item.qty * item.unitPrice)}
+                        </td>
+                        <td className="px-3 py-3 align-middle">
+                          <div className="flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => setPendingDeleteSku(item.sku)}
+                              title="ลบรายการสินค้า"
+                              className="w-10 h-10 rounded-[10px] bg-status-danger-bg text-status-danger hover:brightness-95 flex items-center justify-center transition"
+                            >
+                              <Trash2 className="w-5 h-5" strokeWidth={2} />
                             </button>
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-right text-b2 tabular-nums text-text-secondary">
-                          ฿{fmt(item.unitPrice)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
-                          ฿{fmt(item.qty * item.unitPrice)}
-                        </td>
-                        <td className="px-3 py-3">
-                          <button type="button" onClick={() => removeEditItem(item.sku)}
-                            className="w-8 h-8 rounded-[8px] border border-rose-200 bg-rose-50 hover:bg-rose-100 flex items-center justify-center text-rose-500 transition">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </td>
                       </tr>
                     ))}
                     {editItems.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-10 text-center text-b2 text-text-muted">
+                        <td colSpan={6} className="px-4 py-12 text-center text-b3 text-text-muted">
                           ยังไม่มีรายการสินค้า
                         </td>
                       </tr>
@@ -656,8 +801,8 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                   {editItems.length > 0 && (
                     <tfoot>
                       <tr className="bg-gray-50 border-t-2 border-gray-200">
-                        <td colSpan={3} className="px-4 py-3 text-right text-s2 font-bold text-text-primary">ยอดสุทธิ</td>
-                        <td className="px-4 py-3 text-right text-h5 font-bold tabular-nums" style={{ color: NAVY }}>
+                        <td colSpan={4} className="px-3 py-3.5 text-right text-b3 font-semibold text-text-secondary">ยอดสุทธิ</td>
+                        <td className="px-3 py-3.5 text-right text-s2 font-bold tabular-nums" style={{ color: NAVY }}>
                           ฿{fmt(docTotal(editItems))}
                         </td>
                         <td />
@@ -675,16 +820,16 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                   onChange={e => setEditNote(e.target.value)}
                   rows={2}
                   placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-[12px] text-b2 outline-none focus:border-sky-400 transition resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-[12px] text-b3 outline-none focus:border-sky-400 focus:border-2 transition resize-none"
                 />
               </div>
+
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-100 flex gap-3 shrink-0">
+            <div className="px-6 py-4 border-t border-gray-200 bg-bg-page flex items-center gap-3 shrink-0">
               <button type="button" onClick={() => setView('detail')}
-                className="h-12 px-5 rounded-[12px] border border-gray-300 text-c1 text-text-secondary hover:bg-gray-50 transition flex items-center gap-2">
-                <ChevronLeft className="w-4 h-4" />
+                className="h-12 px-6 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-gray-50 transition">
                 ยกเลิก
               </button>
               <div className="flex-1" />
@@ -703,6 +848,14 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
         )}
 
       </div>
+
+      {/* Supervisor approval to delete an item */}
+      <SupervisorAuthDialog
+        open={pendingDeleteSku !== null}
+        mode="cancel-item"
+        onClose={() => setPendingDeleteSku(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
