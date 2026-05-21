@@ -2698,7 +2698,9 @@ export default function POSScreen() {
                 <span className="text-s1 tabular-nums text-text-primary">{fmt(totals.subtotal)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-c1 text-text-secondary">ยอดรวมของแถม (0 รายการ)</span>
+                <span className="text-c1 text-text-secondary">
+                  ยอดรวมของแถม ({buygetFreeBySku.size + otherFreeRows.length} รายการ)
+                </span>
                 <span className="text-s1 tabular-nums text-text-primary">{fmt(0)}</span>
               </div>
               <div className="flex items-center justify-between">

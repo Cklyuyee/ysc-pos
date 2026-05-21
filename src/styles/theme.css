@@ -390,6 +390,22 @@
   }
 }
 
+/* ---------- Skeleton shimmer (loading placeholders) ---------- */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    rgba(229, 231, 235, 1) 0%,
+    rgba(243, 244, 246, 1) 50%,
+    rgba(229, 231, 235, 1) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
 /* ---------- Cart row animations (CustomerDisplayScreen) ---------- */
 @keyframes cart-slide-in {
   0%   { opacity: 0; transform: translateY(-12px) scale(0.98); }

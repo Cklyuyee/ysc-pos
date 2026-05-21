@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Search, Plus, Minus, ShoppingCart, ChevronDown, Tag } from 'lucide-react';
 import { searchProducts as apiSearchProducts, pickPriceForTier, type ApiProduct } from '../../../services/productsApi';
 import { ProductThumb } from '../ui/ProductThumb';
+import { Skeleton } from '../ui/Skeleton';
 import type { Product } from '../../api/mock/products';
 
 // ─── Mock promo tags (replace with real /promotions API when available) ────────
@@ -228,9 +229,18 @@ export function ProductSearchDialog({
           </div>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 bg-white rounded-[12px] border border-gray-200">
-              <div className="w-8 h-8 border-2 border-brand-navy border-t-transparent rounded-full animate-spin" />
-              <div className="text-b3 text-text-muted">กำลังค้นหา...</div>
+            <div className="bg-white rounded-[12px] border border-gray-200 divide-y divide-gray-100">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="w-12 h-12 rounded-[8px] shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/5" />
+                    <Skeleton className="h-3 w-2/5" />
+                  </div>
+                  <Skeleton className="h-4 w-20 shrink-0" />
+                </div>
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3 bg-white rounded-[12px] border border-gray-200">

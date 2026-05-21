@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Search, X, User, UserPlus, RefreshCw } from 'lucide-react';
 import { searchCustomers, apiCustomerToCustomer } from '../../../services/customersApi';
 import type { Customer } from '../../../data/customers';
+import { Skeleton } from '../../components/ui/Skeleton';
 
 const NAVY = '#0B1E8A';
 const YELLOW = '#FFC518';
@@ -198,8 +199,17 @@ export function CustomerSearchDialog({ open, onClose, onSelect, onRegister, mode
           </div>
 
           {loading ? (
-            <div className="rounded-[12px] bg-bg-page-2 border border-gray-200 flex items-center justify-center py-16">
-              <div className="w-6 h-6 border-2 border-brand-navy border-t-transparent rounded-full animate-spin" />
+            <div className="rounded-[12px] bg-bg-page-2 border border-gray-200 divide-y divide-gray-200">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 px-5 py-4">
+                  <Skeleton className="w-12 h-12 rounded-[12px] shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/5" />
+                    <Skeleton className="h-3 w-2/5" />
+                  </div>
+                  <Skeleton className="h-6 w-20 rounded-full shrink-0" />
+                </div>
+              ))}
             </div>
           ) : errorMsg ? (
             <div className="rounded-[12px] border border-status-danger/30 bg-status-danger-bg px-5 py-4 text-c2 text-status-danger">
