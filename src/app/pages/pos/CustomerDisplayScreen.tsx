@@ -136,7 +136,7 @@ const CartItemRow = memo(function CartItemRow({
   return (
     <tr
       ref={trRef}
-      className={`border-b border-gray-100 last:border-b-0 animate-cart-in ${isLast ? 'animate-cart-flash' : 'bg-white'}`}
+      className={`animate-cart-in ${isLast ? 'animate-cart-flash' : 'bg-white'}`}
     >
       {/* Name + image */}
       <td className="px-5 py-2">
@@ -281,7 +281,7 @@ const ProductTableCard = memo(function ProductTableCard({
               <col style={{ width: 160 }} />
               <col style={{ width: 190 }} />
             </colgroup>
-            <tbody>
+            <tbody className="divide-y divide-gray-200">
               {items.map(item => (
                 <CartItemRow
                   key={item.sku}

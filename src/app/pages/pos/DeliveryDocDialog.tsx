@@ -431,7 +431,7 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                     <tbody>
                       {results.map((doc, i) => (
                         <tr key={doc.id}
-                          className={`border-b border-gray-100 last:border-b-0 hover:bg-sky-50 cursor-pointer transition-colors ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
+                          className={`border-b border-gray-200 last:border-b-0 hover:bg-sky-50 cursor-pointer transition-colors ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
                           onClick={() => openDetail(doc)}>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5">
@@ -538,7 +538,7 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                     </thead>
                     <tbody>
                       {selected.items.map((item, i) => (
-                        <tr key={item.sku} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors">
+                        <tr key={item.sku} className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3.5 text-c1 text-text-muted">{i + 1}</td>
                           <td className="px-4 py-3.5">
                             <div className="text-b3 font-medium text-text-primary">{item.name}</div>
@@ -713,7 +713,7 @@ export default function DeliveryDocDialog({ open, onClose }: Props) {
                   </thead>
                   <tbody>
                     {editItems.map(item => (
-                      <tr key={item.sku} className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors">
+                      <tr key={item.sku} className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50/50 transition-colors">
                         <td className="px-3 py-3 align-middle text-c2 font-mono text-text-secondary">
                           {item.sku}
                         </td>

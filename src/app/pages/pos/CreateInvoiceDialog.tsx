@@ -461,7 +461,7 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                         const total = order.items.reduce((s, item) => s + item.orderedQty * item.currentPrice, 0);
                         return (
                           <tr key={order.id}
-                            className={`border-b border-gray-100 last:border-b-0 transition-colors hover:bg-sky-50 cursor-pointer ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
+                            className={`border-b border-gray-200 last:border-b-0 transition-colors hover:bg-sky-50 cursor-pointer ${i % 2 !== 0 ? 'bg-gray-50/40' : ''}`}
                             onClick={() => setConfirmOrder(order)}>
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-1.5">
@@ -664,7 +664,7 @@ export default function CreateInvoiceDialog({ open, onClose }: Props) {
                     </thead>
                     <tbody>
                       {editItems.map(item => (
-                        <tr key={item.sku} className={`border-b border-gray-100 last:border-b-0 hover:bg-gray-50/50 transition-colors ${item.qty === 0 ? 'opacity-50' : ''}`}>
+                        <tr key={item.sku} className={`border-b border-gray-200 last:border-b-0 hover:bg-gray-50/50 transition-colors ${item.qty === 0 ? 'opacity-50' : ''}`}>
                           <td className="px-3 py-3 align-middle text-c2 font-mono text-text-secondary">
                             {item.sku}
                           </td>

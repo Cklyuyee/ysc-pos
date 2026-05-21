@@ -2388,8 +2388,8 @@ export default function POSScreen() {
                   const lineDiscount = 0; // TODO: backend doesn't expose per-line discount yet
                   const total = price * item.qty - lineDiscount;
                   const fulfillment = fulfillmentMap[item.sku] ?? 'pickup';
-                  return (
-                    <AnimatedCartTr key={item.sku} qty={item.qty} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition">
+                  return [
+                    <AnimatedCartTr key={item.sku} qty={item.qty} className="border-b border-neutral-200 hover:bg-neutral-50/50 transition">
                       {/* 1. รหัสสินค้า */}
                       <td className="px-3 py-3 text-c2 font-mono text-text-secondary align-middle">
                         {product?.barcode ?? item.sku}
@@ -2496,79 +2496,80 @@ export default function POSScreen() {
                           </button>
                         </div>
                       </td>
-                    </AnimatedCartTr>
-                  );
-                })}
-                {/* ── Buy-get free rows (at the bottom, paired by association via the icon) ── */}
-                {Array.from(buygetFreeBySku.values()).map(row => {
-                  const parentSku = row.productSku ?? '';
-                  const parentMode = fulfillmentMap[parentSku] ?? 'pickup';
-                  const freeFulfillment = fulfillmentMap[row.id] ?? parentMode;
-                  return (
-                    <tr key={row.id} className="border-b border-neutral-100 bg-green-50/60 animate-cart-in">
-                      <td className="px-3 py-3 align-middle">
-                        <div className="flex items-center justify-center">
-                          <Gift className="w-5 h-5 text-green-600" />
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 align-middle">
-                        <div className="flex items-center gap-3">
-                          <ProductThumb image={row.image} name={row.name} size={48} />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-b4 text-text-primary leading-snug">{row.name}</div>
-                            {row.badge && (
-                              <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold px-2 py-0.5 rounded-[8px] bg-red-100 text-red-600">
-                                <Tag className="w-3 h-3" />{row.badge}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-center align-middle">
-                        <div className="text-s2 text-text-primary tabular-nums">{row.qty}</div>
-                        <div className="text-c2 text-text-muted">/{row.unit || 'รายการ'}</div>
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums align-middle">
-                        <div className="text-s2 font-bold text-green-600">ฟรี</div>
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums align-middle">
-                        <div className="text-b4 text-text-muted">—</div>
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums align-middle">
-                        <div className="text-s2 font-bold text-green-600">฿0.00</div>
-                      </td>
-                      <td className="px-3 py-3 align-middle">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setFulfillmentMap(m => ({ ...m, [row.id]: 'pickup' }))}
-                            title="รับเองหน้าร้าน"
-                            className={`w-10 h-10 rounded-[10px] flex items-center justify-center transition ${
-                              freeFulfillment === 'pickup'
-                                ? 'bg-[#E5F2FF] border-2 border-[#0197FF] text-[#0197FF]'
-                                : 'bg-white text-text-primary border border-gray-200 hover:bg-bg-page-2'
-                            }`}
-                          >
-                            <Store className="w-5 h-5" strokeWidth={2} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setFulfillmentMap(m => ({ ...m, [row.id]: 'delivery' }))}
-                            title="จัดส่งผ่านขนส่ง"
-                            className={`w-10 h-10 rounded-[10px] flex items-center justify-center transition ${
-                              freeFulfillment === 'delivery'
-                                ? 'bg-[#FFEFD9] border-2 border-[#F2994A] text-[#F2994A]'
-                                : 'bg-white text-text-primary border border-gray-200 hover:bg-bg-page-2'
-                            }`}
-                          >
-                            <Truck className="w-5 h-5" strokeWidth={2} />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 align-middle" />
-                    </tr>
-                  );
-                })}
+                    </AnimatedCartTr>,
+                    /* Buy-get free row associated with this SKU — rendered RIGHT AFTER parent */
+                    (() => {
+                      const row = buygetFreeBySku.get(item.sku);
+                      if (!row) return null;
+                      const parentMode = fulfillmentMap[item.sku] ?? 'pickup';
+                      const freeFulfillment = fulfillmentMap[row.id] ?? parentMode;
+                      return (
+                        <tr key={`${item.sku}-free`} className="border-b border-neutral-200 bg-green-50/60 animate-cart-in">
+                          <td className="px-3 py-3 align-middle">
+                            <div className="flex items-center justify-center">
+                              <Gift className="w-5 h-5 text-green-600" />
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 align-middle">
+                            <div className="flex items-center gap-3">
+                              <ProductThumb image={row.image} name={row.name} size={48} />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-b4 text-text-primary leading-snug">{row.name}</div>
+                                {row.badge && (
+                                  <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold px-2 py-0.5 rounded-[8px] bg-red-100 text-red-600">
+                                    <Tag className="w-3 h-3" />{row.badge}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-center align-middle">
+                            <div className="text-s2 text-text-primary tabular-nums">{row.qty}</div>
+                            <div className="text-c2 text-text-muted">/{row.unit || 'รายการ'}</div>
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums align-middle">
+                            <div className="text-s2 font-bold text-green-600">ฟรี</div>
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums align-middle">
+                            <div className="text-b4 text-text-muted">—</div>
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums align-middle">
+                            <div className="text-s2 font-bold text-green-600">฿0.00</div>
+                          </td>
+                          <td className="px-3 py-3 align-middle">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setFulfillmentMap(m => ({ ...m, [row.id]: 'pickup' }))}
+                                title="รับเองหน้าร้าน"
+                                className={`w-10 h-10 rounded-[10px] flex items-center justify-center transition ${
+                                  freeFulfillment === 'pickup'
+                                    ? 'bg-[#E5F2FF] border-2 border-[#0197FF] text-[#0197FF]'
+                                    : 'bg-white text-text-primary border border-gray-200 hover:bg-bg-page-2'
+                                }`}
+                              >
+                                <Store className="w-5 h-5" strokeWidth={2} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFulfillmentMap(m => ({ ...m, [row.id]: 'delivery' }))}
+                                title="จัดส่งผ่านขนส่ง"
+                                className={`w-10 h-10 rounded-[10px] flex items-center justify-center transition ${
+                                  freeFulfillment === 'delivery'
+                                    ? 'bg-[#FFEFD9] border-2 border-[#F2994A] text-[#F2994A]'
+                                    : 'bg-white text-text-primary border border-gray-200 hover:bg-bg-page-2'
+                                }`}
+                              >
+                                <Truck className="w-5 h-5" strokeWidth={2} />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 align-middle" />
+                        </tr>
+                      );
+                    })(),
+                  ];
+                }).flat()}
                 {/* ── Other free items (order gifts / brand promos / redeemed rewards) at the bottom ── */}
                 {(() => {
                   // Default fulfillment for free items not tied to a parent SKU:
@@ -2582,7 +2583,7 @@ export default function POSScreen() {
                   const Icon = row.kind === 'reward' ? Trophy : Gift;
                   const rowFulfillment = fulfillmentMap[row.id] ?? dominantFulfillment;
                   return (
-                    <tr key={row.id} className="border-b border-neutral-100 bg-green-50/60 animate-cart-in">
+                    <tr key={row.id} className="border-b border-neutral-200 bg-green-50/60 animate-cart-in">
                       {/* 1. รหัสสินค้า → icon only */}
                       <td className="px-3 py-3 align-middle">
                         <div className="flex items-center justify-center">

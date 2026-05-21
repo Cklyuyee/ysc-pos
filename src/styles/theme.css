@@ -399,8 +399,8 @@
 
 @keyframes cart-flash {
   0%   { background-color: rgba(56, 189, 248, 0.45); box-shadow: inset 4px 0 0 0 #0EA5E9; }
-  60%  { background-color: rgba(186, 230, 253, 0.6); box-shadow: inset 4px 0 0 0 #0EA5E9; }
-  100% { background-color: rgba(240, 249, 255, 1);   box-shadow: inset 4px 0 0 0 transparent; }
+  60%  { background-color: rgba(186, 230, 253, 0.4); box-shadow: inset 4px 0 0 0 #0EA5E9; }
+  100% { background-color: transparent;              box-shadow: inset 4px 0 0 0 transparent; }
 }
 
 @layer utilities {
