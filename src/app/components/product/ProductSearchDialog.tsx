@@ -4,25 +4,7 @@ import { searchProducts as apiSearchProducts, pickPriceForTier, type ApiProduct 
 import { ProductThumb } from '../ui/ProductThumb';
 import { Skeleton } from '../ui/Skeleton';
 import type { Product } from '../../api/mock/products';
-
-// ─── Mock promo tags (replace with real /promotions API when available) ────────
-type PromoTagColor = 'amber' | 'red' | 'sky'
-interface MockPromoTag { label: string; color: PromoTagColor }
-function getMockPromoTags(brand?: string): MockPromoTag[] {
-  if (!brand || brand === '-') return []
-  const hash = brand.split('').reduce((s, c) => s + c.charCodeAt(0), 0)
-  const tags: MockPromoTag[] = [{ label: `โปรแบรนด์ ${brand}`, color: 'amber' }]
-  const n = hash % 5
-  if (n === 0) tags.push({ label: 'ซื้อ 1 แถม 1', color: 'red' })
-  else if (n === 1) tags.push({ label: 'ลด 10%', color: 'sky' })
-  else if (n === 2) tags.push({ label: 'ลด 15%', color: 'sky' })
-  return tags
-}
-const PROMO_STYLES: Record<PromoTagColor, string> = {
-  amber: 'bg-amber-100 text-amber-700',
-  red:   'bg-red-100 text-red-600',
-  sky:   'bg-sky-100 text-sky-600',
-}
+import { getMockPromoTags, PROMO_TAG_STYLES } from '../../utils/promoTags';
 
 const NAVY = '#0B1E8A';
 
@@ -279,7 +261,7 @@ export function ProductSearchDialog({
                             {getMockPromoTags(p.brand).length > 0 && (
                               <div className="flex flex-wrap items-center gap-1 mt-0.5">
                                 {getMockPromoTags(p.brand).map(tag => (
-                                  <span key={tag.label} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium leading-none ${PROMO_STYLES[tag.color]}`}>
+                                  <span key={tag.label} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[6px] text-[11px] font-medium leading-none ${PROMO_TAG_STYLES[tag.color]}`}>
                                     <Tag className="shrink-0" style={{ width: 11, height: 11 }} strokeWidth={2.5} />
                                     {tag.label}
                                   </span>

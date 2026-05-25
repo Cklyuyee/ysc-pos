@@ -42,6 +42,7 @@ import { ProductSearchDialog } from '../../components/product/ProductSearchDialo
 import { ProductThumb } from '../../components/ui/ProductThumb';
 import type { Product as MockProduct } from '../../api/mock/products';
 import type { Customer, Address } from '../../../data/customers';
+import { getMockPromoTags, getBuyGetQty, PROMO_TAG_STYLES, type PromoTagColor, type MockPromoTag } from '../../utils/promoTags';
 
 const NAVY = '#0B1E8A';
 const YELLOW = '#FFC518';
@@ -70,30 +71,6 @@ const TIER_MAP: Record<string, { bg: string; text: string; border: string; label
   'Diamond':    { bg: 'bg-sky-100',       text: 'text-sky-800',       border: 'border-sky-200',     label: 'Diamond',  icon: Gem },
   'Coronet':    { bg: 'bg-purple-700',    text: 'text-white',         border: 'border-purple-700',  label: 'Coronet',  icon: Crown },
 };
-
-// ─── Mock promotion tags (replace with real /promotions API when available) ───
-type PromoTagColor = 'amber' | 'red' | 'sky' | 'green'
-interface MockPromoTag { label: string; color: PromoTagColor }
-
-/** Deterministic mock promo tags from product brand until /promotions API exists. */
-function getMockPromoTags(brand?: string): MockPromoTag[] {
-  if (!brand) return []
-  const hash = brand.split('').reduce((s, c) => s + c.charCodeAt(0), 0)
-  const tags: MockPromoTag[] = [{ label: `โปรแบรนด์ ${brand}`, color: 'amber' }]
-  const n = hash % 5
-  if (n === 0) tags.push({ label: 'ซื้อ 1 แถม 1', color: 'red' })
-  else if (n === 1) tags.push({ label: 'ลด 10%', color: 'sky' })
-  else if (n === 2) tags.push({ label: 'ลด 15%', color: 'sky' })
-  // n === 3 or 4: just brand tag
-  return tags
-}
-
-const PROMO_TAG_STYLES: Record<PromoTagColor, string> = {
-  amber: 'bg-amber-100 text-amber-700',
-  red:   'bg-red-100 text-red-600',
-  sky:   'bg-sky-100 text-sky-600',
-  green: 'bg-green-100 text-green-700',
-}
 
 function PromoTagList({ brand, size = 'sm' }: { brand?: string; size?: 'xs' | 'sm' }) {
   const tags = getMockPromoTags(brand)
@@ -1237,11 +1214,23 @@ export default function POSScreen() {
     navigate('/login');
   };
 
-  // Totals
+  // Totals — subtract the value of buy-get free items (they're in cartItems but
+  // free per promo, so the customer only pays for the paid portion of each line).
   const totals = useMemo(() => {
-    const subtotal = cartItems.reduce((s, i) => s + parseFloat(i.unitPrice) * i.qty, 0);
+    const subtotal = cartItems.reduce((s, i) => {
+      const price = parseFloat(i.unitPrice);
+      const p = productMap.get(i.sku);
+      // If this SKU has an auto-claimed buy-get, free portion = floor(qty / (buyQty+1))
+      let giftQty = 0;
+      if (claimedBuyGetSkus.has(i.sku)) {
+        const buyQty = getBuyGetQty(p?.brand, i.sku);
+        giftQty = Math.floor(i.qty / (buyQty + 1));
+      }
+      const paidQty = i.qty - giftQty;
+      return s + price * paidQty;
+    }, 0);
     return { subtotal, grand: subtotal, count: cartItems.length };
-  }, [cartItems]);
+  }, [cartItems, productMap, claimedBuyGetSkus]);
 
   // ─── Mock promotions derived from cart ────────────────────────────────────
   /** Items whose brand hash qualifies for "ซื้อ 2 แถม 1" (mock) */
@@ -1254,6 +1243,32 @@ export default function POSScreen() {
       return hash % 5 === 0
     })
   }, [cartItems, productMap, customer])
+
+  // ─── Auto-claim buy-get free items as soon as cart meets the threshold ────
+  //
+  // Previously the cashier had to click "รอสแกน" then physically grab and
+  // re-scan the gift item; easy to forget and customers missed their promo.
+  // Now the moment cart qty hits buy-X-get-Y, the SKU is auto-added to
+  // claimedBuyGetSkus, which flows into buygetFreeBySku → cart free row.
+  // (Cashier still hands over the physical item — only the SYSTEM tracks it.)
+  useEffect(() => {
+    if (!customer) {
+      // Reset on customer clear
+      setClaimedBuyGetSkus(prev => prev.size === 0 ? prev : new Set())
+      return
+    }
+    const next = new Set<string>()
+    mockBuyGetItems.forEach(item => {
+      const p = productMap.get(item.sku)
+      const buyQty = getBuyGetQty(p?.brand, item.sku)
+      // Qualify only when cart has at least one full set (buyQty + 1).
+      if (Math.floor(item.qty / (buyQty + 1)) >= 1) next.add(item.sku)
+    })
+    setClaimedBuyGetSkus(prev => {
+      if (prev.size === next.size && [...prev].every(sku => next.has(sku))) return prev
+      return next
+    })
+  }, [mockBuyGetItems, productMap, customer])
 
   /** Brand promo progress bars (mock — threshold ฿2,000 per brand) */
   const mockBrandPromos = useMemo(() => {
@@ -1367,9 +1382,10 @@ export default function POSScreen() {
     const m = new Map<string, FreeCartRow>()
     mockBuyGetItems.filter(i => claimedBuyGetSkus.has(i.sku)).forEach(item => {
       const p = productMap.get(item.sku)
-      const brandHash = (p?.brand ?? item.sku).split('').reduce((s, c) => s + c.charCodeAt(0), 0)
-      const buyQty = brandHash % 2 === 0 ? 1 : 2
-      const giftQty = Math.floor(item.qty / buyQty)
+      const buyQty = getBuyGetQty(p?.brand, item.sku)
+      // "ซื้อ X แถม 1" — every group of (X+1) items: X paid + 1 free.
+      const groupSize = buyQty + 1
+      const giftQty = Math.floor(item.qty / groupSize)
       m.set(item.sku, {
         id: `buyget-${item.sku}`,
         kind: 'buyget',
@@ -1783,8 +1799,7 @@ export default function POSScreen() {
                 {/* ── Unscanned: buy-get free ── */}
                 {unscannedBuyGet.map(item => {
                   const p = productMap.get(item.sku);
-                  const brandHash = (p?.brand ?? item.sku).split('').reduce((s, c) => s + c.charCodeAt(0), 0);
-                  const buyQty = brandHash % 2 === 0 ? 1 : 2;
+                  const buyQty = getBuyGetQty(p?.brand, item.sku);
                   const giftQty = Math.floor(item.qty / buyQty);
                   return (
                     <div key={item.sku} className="rounded-[12px] border border-amber-400 bg-amber-50 p-3 flex items-start gap-3">
@@ -1795,7 +1810,7 @@ export default function POSScreen() {
                           <span className="text-c1 font-bold shrink-0" style={{ color: NAVY }}>{giftQty} {p?.unit ?? 'ชิ้น'}</span>
                         </div>
                         <div className="flex items-center justify-between gap-2 mt-2">
-                          <span className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-[8px] bg-red-100 text-red-600 shrink-0">
+                          <span className="flex items-center gap-1 text-[11px] font-medium leading-none px-2.5 py-1 rounded-[6px] bg-red-100 text-red-600 shrink-0">
                             <Tag className="w-3 h-3" />ซื้อ {buyQty} แถม 1
                           </span>
                           <span className="flex items-center gap-1.5 px-3 py-1 rounded-[8px] text-c2 font-bold shrink-0" style={{ backgroundColor: '#FFE3A3', color: '#C36800' }}>
@@ -2385,8 +2400,16 @@ export default function POSScreen() {
                 {[...cartItems].sort((a, b) => (a.addedAt ?? '').localeCompare(b.addedAt ?? '')).map(item => {
                   const product = productMap.get(item.sku);
                   const price = parseFloat(item.unitPrice);
+                  // For "buy X get 1" promos, parent row charges only paidQty
+                  // (qty - giftQty) so we don't double-count with the free row below.
+                  let giftQty = 0;
+                  if (claimedBuyGetSkus.has(item.sku)) {
+                    const buyQty = getBuyGetQty(product?.brand, item.sku);
+                    giftQty = Math.floor(item.qty / (buyQty + 1));
+                  }
+                  const paidQty = item.qty - giftQty;
                   const lineDiscount = 0; // TODO: backend doesn't expose per-line discount yet
-                  const total = price * item.qty - lineDiscount;
+                  const total = price * paidQty - lineDiscount;
                   const fulfillment = fulfillmentMap[item.sku] ?? 'pickup';
                   return [
                     <AnimatedCartTr key={item.sku} qty={item.qty} className="border-b border-neutral-200 hover:bg-neutral-50/50 transition">
@@ -2410,9 +2433,9 @@ export default function POSScreen() {
                           </div>
                         </div>
                       </td>
-                      {/* 3. จำนวน (display only) */}
+                      {/* 3. จำนวน (display paid qty; gift qty is on the free row below) */}
                       <td className="px-3 py-3 text-center align-middle">
-                        <div className="text-s2 text-text-primary tabular-nums">{item.qty}</div>
+                        <div className="text-s2 text-text-primary tabular-nums">{paidQty}</div>
                         <div className="text-c2 text-text-muted">/{product?.unit ?? 'ชิ้น'}</div>
                       </td>
                       {/* 4. ราคา/หน่วย */}
@@ -2516,7 +2539,7 @@ export default function POSScreen() {
                               <div className="flex-1 min-w-0">
                                 <div className="text-b4 text-text-primary leading-snug">{row.name}</div>
                                 {row.badge && (
-                                  <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold px-2 py-0.5 rounded-[8px] bg-red-100 text-red-600">
+                                  <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-medium leading-none px-2.5 py-1 rounded-[6px] bg-red-100 text-red-600">
                                     <Tag className="w-3 h-3" />{row.badge}
                                   </span>
                                 )}
@@ -2878,8 +2901,7 @@ export default function POSScreen() {
                   {mockBuyGetItems.map(item => {
                     const p = productMap.get(item.sku)
                     if (claimedBuyGetSkus.has(item.sku)) return null
-                    const brandHash = (p?.brand ?? item.sku).split('').reduce((s, c) => s + c.charCodeAt(0), 0)
-                    const buyQty = brandHash % 2 === 0 ? 1 : 2
+                    const buyQty = getBuyGetQty(p?.brand, item.sku)
                     const giftQty = Math.floor(item.qty / buyQty)
                     if (giftQty < 1) return null
                     const promoTag = `ซื้อ ${buyQty} แถม 1`
@@ -2892,7 +2914,7 @@ export default function POSScreen() {
                             <span className="text-s2 font-bold shrink-0 mt-0.5" style={{ color: NAVY }}>{item.qty} {p?.unit ?? 'ชิ้น'}</span>
                           </div>
                           <div className="flex items-center justify-between mt-2.5 gap-2">
-                            <span className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-[8px] bg-red-100 text-red-600 shrink-0">
+                            <span className="flex items-center gap-1 text-[11px] font-medium leading-none px-2.5 py-1 rounded-[6px] bg-red-100 text-red-600 shrink-0">
                               <Tag className="w-3 h-3" />{promoTag}
                             </span>
                             <button
@@ -2928,8 +2950,7 @@ export default function POSScreen() {
                           <div className="space-y-2">
                             {claimedItems.map(item => {
                               const p = productMap.get(item.sku)
-                              const brandHash = (p?.brand ?? item.sku).split('').reduce((s, c) => s + c.charCodeAt(0), 0)
-                              const buyQty = brandHash % 2 === 0 ? 1 : 2
+                              const buyQty = getBuyGetQty(p?.brand, item.sku)
                               const giftQty = Math.floor(item.qty / buyQty)
                               const promoTag = `ซื้อ ${buyQty} แถม 1`
                               return (
@@ -2941,7 +2962,7 @@ export default function POSScreen() {
                                       <span className="text-s2 font-bold shrink-0 mt-0.5" style={{ color: NAVY }}>{giftQty} {p?.unit ?? 'ชิ้น'}</span>
                                     </div>
                                     <div className="flex items-center justify-between mt-2.5 gap-2">
-                                      <span className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-[8px] bg-red-100 text-red-600 shrink-0">
+                                      <span className="flex items-center gap-1 text-[11px] font-medium leading-none px-2.5 py-1 rounded-[6px] bg-red-100 text-red-600 shrink-0">
                                         <Tag className="w-3 h-3" />{promoTag}
                                       </span>
                                       <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[12px] font-bold shrink-0" style={{ backgroundColor: '#CDFFE7', color: '#27AE60' }}>
