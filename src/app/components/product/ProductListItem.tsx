@@ -76,9 +76,9 @@ export function ProductListItem({
             attr={product.attr}
           />
           <div className="flex flex-wrap items-center gap-1.5 mt-1">
-            {product.preorderType === 'out_of_stock'  && <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-200">สินค้าหมด</span>}
-            {product.preorderType === 'made_to_order' && <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-200">สั่งผลิตพิเศษ</span>}
-            {product.preorderType === 'import'        && <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-200">นำเข้า</span>}
+            {product.preorderType === 'out_of_stock'  && <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-c3 font-semibold bg-amber-50 text-amber-600 border border-amber-200">สินค้าหมด</span>}
+            {product.preorderType === 'made_to_order' && <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-c3 font-semibold bg-amber-50 text-amber-600 border border-amber-200">สั่งผลิตพิเศษ</span>}
+            {product.preorderType === 'import'        && <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-c3 font-semibold bg-amber-50 text-amber-600 border border-amber-200">นำเข้า</span>}
           </div>
           {showLastOrder && product.lastOrderDate && product.lastOrderId && (
             <div className="text-[10px] text-emerald-500 mt-1">
@@ -98,7 +98,7 @@ export function ProductListItem({
       {/* Right: Price + Stock + Controls */}
       <div className="shrink-0 flex flex-col items-end justify-between gap-1.5">
         <div className="text-right">
-          <p className="font-bold text-brand-primary text-sm">
+          <p className="font-bold text-brand-primary text-c3">
             ฿{product.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           {product.promo?.sameSku && product.promo.minQty && product.promo.freeQty ? (
@@ -118,7 +118,7 @@ export function ProductListItem({
             />
             <Button
               onClick={handleAddClick}
-              className="h-8 px-3 bg-brand-primary hover:bg-blue-600 text-white text-xs font-semibold rounded-lg"
+              className="h-8 px-3 bg-brand-primary hover:bg-blue-600 text-white text-c3 font-semibold rounded-[12px]"
             >
               เพิ่ม
             </Button>

@@ -45,9 +45,17 @@ export interface ApiCustomer {
   creditLimit?: number
   creditUsed?: number
   rewardPoints?: number
+  pointsExpiring?: number
+  pointsExpiryDate?: string
   type?: string
   contactPerson?: string
   docType?: string
+  /** เลขประจำตัวผู้เสียภาษี — สำหรับออกใบกำกับภาษี */
+  taxId?: string
+  /** ยอดซื้อสะสมตลอด (THB) — สำหรับแสดง tier progress / CRM */
+  totalSpent?: number
+  /** สถานะลูกค้า: "active" | "suspended" | "blacklist" | etc. */
+  status?: string
 }
 
 function normalize(r: RawApiCustomer): ApiCustomer {
@@ -62,9 +70,14 @@ function normalize(r: RawApiCustomer): ApiCustomer {
     creditLimit: Number(r.creditLimit),
     creditUsed: Number(r.creditUsed),
     rewardPoints: r.rewardPoints,
+    pointsExpiring: r.pointsExpiring ?? undefined,
+    pointsExpiryDate: r.pointsExpiryDate ?? undefined,
     type: r.custType,
     contactPerson: r.contactPerson ?? undefined,
     docType: r.docType ?? undefined,
+    taxId: r.taxId ?? undefined,
+    totalSpent: r.totalSpent ? Number(r.totalSpent) : undefined,
+    status: r.status,
   }
 }
 
@@ -109,15 +122,20 @@ export function apiCustomerToCustomer(c: ApiCustomer): Customer {
     id: c.id,
     code: c.code,
     name: c.name,
+    taxId: c.taxId ?? '',
     phone: c.phone ?? '',
     email: c.email ?? '',
     tier: (c.tier ?? 'Silver') as Customer['tier'],
     priceTier: c.priceTier ?? 'P5',
+    totalSpent: c.totalSpent ?? 0,
     creditLimit: c.creditLimit ?? 0,
     creditUsed: c.creditUsed ?? 0,
     rewardPoints: c.rewardPoints ?? 0,
+    pointsExpiring: c.pointsExpiring,
+    pointsExpiryDate: c.pointsExpiryDate,
     type: (c.type ?? 'person') as Customer['type'],
     contactPerson: c.contactPerson,
+    status: c.status,
     address: '',
     subDistrict: '',
     district: '',

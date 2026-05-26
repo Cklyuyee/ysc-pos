@@ -2,82 +2,224 @@
 
 :root {
   --font-size: 16px;
-  --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #2563EB;
-  --primary-foreground: #ffffff;
-  --secondary: oklch(0.95 0.0058 264.53);
-  --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #e9ebef;
-  --accent-foreground: #030213;
-  --destructive: #d4183d;
-  --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
-  --input: #e2e8f0;
-  --input-background: #ffffff;
-  --switch-background: #cbced4;
-  --font-weight-medium: 500;
+
+  /* shadcn surface tokens — remapped to new palette */
+  --background: #FFFFFF;
+  --foreground: #111827;
+  --card: #FFFFFF;
+  --card-foreground: #111827;
+  --popover: #FFFFFF;
+  --popover-foreground: #111827;
+
+  /* Primary = Navy (per PDF: Primary Button = Navy bg + white text) */
+  --primary: #0B1E8A;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #F3F4F6;        /* Gray-100 */
+  --secondary-foreground: #111827;
+
+  --muted: #F3F4F6;            /* Gray-100 */
+  --muted-foreground: #6D717F; /* Gray-500 */
+
+  --accent: #EAF2F8;           /* BG */
+  --accent-foreground: #0B1E8A;
+
+  --destructive: #FF0000;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E5E7EA;           /* Gray-200 */
+  --input: #E5E7EA;
+  --input-background: #FFFFFF;
+  --switch-background: #D1D5DB;
+
   --font-weight-normal: 400;
-  --ring: #2563EB;
-  --radius: 0.625rem;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --ring: #0B1E8A;             /* Navy focus ring */
+  --radius: 0.5rem;            /* 8px = radius-md */
 }
 
 @theme inline {
-  --font-sans: "Google Sans", system-ui, sans-serif;
-  --font-heading: "Google Sans", system-ui, sans-serif;
+  /* ---------- Typography ---------- */
+  --font-sans: "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* Brand Design System Colors */
-  --color-brand-primary: #2563EB;
-  --color-brand-primary-dark: #1D4ED8;
-  --color-brand-primary-light: #EFF6FF;
-  --color-brand-accent: #FBBF24;
-  --color-brand-secondary: #FBBF24;
+  /* ---------- Type scale (per Figma design system) ---------- */
+  /* Headlines — Bold */
+  --text-h1: 56px;
+  --text-h1--line-height: 64px;
+  --text-h1--font-weight: 700;
+  --text-h1--letter-spacing: 0;
 
-  --color-brand-navy: #1e3a8a;
-  --color-brand-navy-light: #1e40af;
-  --color-brand-navy-dark: #172554;
+  --text-h2: 44px;
+  --text-h2--line-height: 52px;
+  --text-h2--font-weight: 700;
+  --text-h2--letter-spacing: 0;
 
-  --color-bg-page: #F8F9FB;
+  --text-h3: 32px;
+  --text-h3--line-height: 40px;
+  --text-h3--font-weight: 700;
+  --text-h3--letter-spacing: 0;
+
+  --text-h4: 28px;
+  --text-h4--line-height: 36px;
+  --text-h4--font-weight: 700;
+  --text-h4--letter-spacing: 0;
+
+  --text-h5: 24px;
+  --text-h5--line-height: 30px;
+  --text-h5--font-weight: 700;
+  --text-h5--letter-spacing: 0;
+
+  /* Subtitles — Bold */
+  --text-s1: 22px;
+  --text-s1--line-height: 28px;
+  --text-s1--font-weight: 700;
+  --text-s1--letter-spacing: 0;
+
+  --text-s2: 20px;
+  --text-s2--line-height: 26px;
+  --text-s2--font-weight: 700;
+  --text-s2--letter-spacing: 0;
+
+  /* Body */
+  --text-b1: 22px;            /* Regular */
+  --text-b1--line-height: 28px;
+  --text-b1--font-weight: 400;
+  --text-b1--letter-spacing: 0;
+
+  --text-b2: 22px;            /* Medium */
+  --text-b2--line-height: 28px;
+  --text-b2--font-weight: 500;
+  --text-b2--letter-spacing: 0;
+
+  --text-b3: 20px;            /* Regular */
+  --text-b3--line-height: 26px;
+  --text-b3--font-weight: 400;
+  --text-b3--letter-spacing: 0;
+
+  --text-b4: 20px;            /* Medium */
+  --text-b4--line-height: 26px;
+  --text-b4--font-weight: 500;
+  --text-b4--letter-spacing: 0;
+
+  /* Caption */
+  --text-c1: 18px;            /* Regular */
+  --text-c1--line-height: 26px;
+  --text-c1--font-weight: 400;
+  --text-c1--letter-spacing: 0;
+
+  --text-c2: 16px;            /* Medium */
+  --text-c2--line-height: 22px;
+  --text-c2--font-weight: 500;
+  --text-c2--letter-spacing: 0;
+
+  --text-c3: 14px;            /* Medium */
+  --text-c3--line-height: 20px;
+  --text-c3--font-weight: 500;
+  --text-c3--letter-spacing: 0;
+
+  /* Button labels */
+  --text-btn-giant: 20px;       /* Bold */
+  --text-btn-giant--line-height: 26px;
+  --text-btn-giant--font-weight: 700;
+  --text-btn-giant--letter-spacing: 0;
+
+  --text-btn-large: 18px;
+  --text-btn-large--line-height: 22px;
+  --text-btn-large--font-weight: 400;
+  --text-btn-large--letter-spacing: 0;
+
+  --text-btn-medium: 14px;
+  --text-btn-medium--line-height: 20px;
+  --text-btn-medium--font-weight: 400;
+  --text-btn-medium--letter-spacing: 0;
+
+  /* ---------- Brand / Primary palette (per Figma color spec) ---------- */
+  --color-brand-navy: #0B1E8A;         /* Navy */
+  --color-brand-navy-dark: #061459;    /* derived darker */
+  --color-brand-navy-light: #0197FF;   /* aliased to Blue */
+
+  --color-brand-blue: #0197FF;
+  --color-brand-yellow: #FFC518;
+
+  /* Backwards-compat aliases */
+  --color-brand-primary: #0B1E8A;      /* = Navy */
+  --color-brand-primary-dark: #061459;
+  --color-brand-primary-light: #EAF2F8;
+  --color-brand-accent: #FFC518;       /* Yellow */
+  --color-brand-secondary: #FFC518;
+
+  /* ---------- Neutral / Surfaces ---------- */
+  --color-white: #FFFFFF;
+  --color-bg-page: #EAF2F8;            /* BG */
+  --color-bg-page-2: #FBFCFD;          /* BG 2 */
   --color-bg-card: #FFFFFF;
-  --color-bg-hover: #EFF6FF;
+  --color-bg-hover: #FBFCFD;
 
-  --color-border-default: #E5E7EB;
-  --color-border-focus: #2563EB;
+  /* Gray ramp (Figma neutral colors) */
+  --color-gray-50: #F9FAFB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-200: #E5E7EA;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9EA2AE;
+  --color-gray-500: #6D717F;
+  --color-gray-600: #4D5461;
+  --color-gray-700: #394050;
+  --color-gray-800: #212936;
+  --color-gray-900: #111827;
 
-  --color-text-primary: #111827;
-  --color-text-secondary: #6B7280;
-  --color-text-muted: #9CA3AF;
-  --color-text-link: #2563EB;
+  /* ---------- Extended scale / Soft ---------- */
+  --color-blue-light: #56CCF2;
+  --color-yellow-hover: #F4D76A;
+  --color-yellow-soft: #FFF4CC;
+
+  /* ---------- Extended scale / Blue scale ---------- */
+  --color-blue-100: #EBF6FF;
+  --color-blue-300: #56CCF2;
+  --color-blue-500: #2D9CDB;
+  --color-blue-700: #1D4ED8;
+  --color-blue-900: #0B1E8A;
+
+  /* ---------- Borders ---------- */
+  --color-border-default: #E5E7EA;     /* Gray-200 */
+  --color-border-strong: #D1D5DB;      /* Gray-300 */
+  --color-border-focus: #0B1E8A;       /* Navy */
+
+  /* ---------- Text ---------- */
+  --color-text-primary: #111827;       /* Gray-900 */
+  --color-text-secondary: #4D5461;     /* Gray-600 */
+  --color-text-muted: #9EA2AE;         /* Gray-400 */
+  --color-text-link: #0197FF;          /* Blue */
   --color-text-on-dark: #FFFFFF;
 
-  --color-status-success: #10B981;
-  --color-status-success-bg: #ECFDF5;
-  --color-status-warning: #FBBF24;
-  --color-status-warning-bg: #FEF3C7;
-  --color-status-danger: #EF4444;
-  --color-status-danger-bg: #FEF2F2;
-  --color-status-info: #2563EB;
-  --color-status-info-bg: #EFF6FF;
+  /* ---------- Semantic / Status (per Figma color spec) ---------- */
+  --color-status-success: #27AE60;
+  --color-status-success-bg: #E8F6EE;
+  --color-status-warning: #F2994A;
+  --color-status-warning-bg: #FDF1E6;
+  --color-status-danger: #FF0000;
+  --color-status-danger-bg: #FFE5E5;
+  --color-status-info: #0197FF;
+  --color-status-info-bg: #EBF6FF;     /* Blue-100 */
 
-  --color-tier-prospect-bg: #f1f5f9;
-  --color-tier-prospect-text: #64748b;
-  --color-tier-member-bg: #3b82f6;
-  --color-tier-member-text: #ffffff;
-  --color-tier-silver-bg: #cbd5e1;
-  --color-tier-silver-text: #1e293b;
-  --color-tier-gold-bg: #fbbf24;
-  --color-tier-gold-text: #451a03;
-  --color-tier-platinum-bg: #334155;
-  --color-tier-platinum-text: #ffffff;
-  --color-tier-diamond-bg: #1e40af;
-  --color-tier-diamond-text: #ffffff;
+  /* ---------- Member tier ---------- */
+  --color-tier-prospect-bg: #F3F4F6;
+  --color-tier-prospect-text: #4D5461;
+  --color-tier-member-bg: #0197FF;
+  --color-tier-member-text: #FFFFFF;
+  --color-tier-silver-bg: #D1D5DB;
+  --color-tier-silver-text: #212936;
+  --color-tier-gold-bg: #FFC518;
+  --color-tier-gold-text: #212936;
+  --color-tier-platinum-bg: #394050;
+  --color-tier-platinum-text: #FFFFFF;
+  --color-tier-diamond-bg: #0B1E8A;
+  --color-tier-diamond-text: #FFFFFF;
 
+  /* ---------- shadcn bridge (so existing components still work) ---------- */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -98,12 +240,37 @@
   --color-input: var(--input);
   --color-input-background: var(--input-background);
   --color-ring: var(--ring);
-  --radius-sm: 6px;
+
+  /* ---------- Spacing (4pt scale per PDF) ---------- */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+
+  /* ---------- Radius ---------- */
+  --radius-sm: 4px;
   --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
   --radius-full: 9999px;
+
+  /* ---------- Shadows (soft, enterprise) ---------- */
+  --shadow-card: 0 1px 2px rgba(11, 30, 138, 0.04), 0 1px 3px rgba(11, 30, 138, 0.06);
+  --shadow-elev: 0 4px 12px rgba(11, 30, 138, 0.08);
+  --shadow-focus: 0 0 0 3px rgba(11, 30, 138, 0.18);
+
+  /* ---------- Motion ---------- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 200ms;
+  --duration-base: 250ms;
+  --duration-slow: 300ms;
 }
 
 @layer base {
@@ -111,36 +278,152 @@
     @apply border-border outline-ring/50;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: "Google Sans", sans-serif;
-  }
-
   html {
     font-size: var(--font-size);
   }
 
-  /* Global Custom Scrollbar */
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Noto Sans Thai", system-ui, -apple-system, "Segoe UI", sans-serif;
+    /* Default body = B3 (20/26 Regular) per Figma type scale */
+    font-size: var(--text-b3);
+    line-height: var(--text-b3--line-height);
+    font-weight: var(--text-b3--font-weight);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Native heading defaults from type scale */
+  h1 { font-size: var(--text-h1); line-height: var(--text-h1--line-height); font-weight: 700; letter-spacing: 0; }
+  h2 { font-size: var(--text-h2); line-height: var(--text-h2--line-height); font-weight: 700; letter-spacing: 0; }
+  h3 { font-size: var(--text-h3); line-height: var(--text-h3--line-height); font-weight: 700; letter-spacing: 0; }
+  h4 { font-size: var(--text-h4); line-height: var(--text-h4--line-height); font-weight: 700; letter-spacing: 0; }
+  h5 { font-size: var(--text-h5); line-height: var(--text-h5--line-height); font-weight: 700; letter-spacing: 0; }
+  h6 { font-size: var(--text-s1); line-height: var(--text-s1--line-height); font-weight: 700; letter-spacing: 0; }
+  small { font-size: var(--text-c2); line-height: var(--text-c2--line-height); }
+
+  /* Custom scrollbar — uses neutral grays */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-
   ::-webkit-scrollbar-track {
     background: transparent;
   }
-
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 10px;
+    background: #D1D5DB;
+    border-radius: 9999px;
   }
-
   ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #9EA3AE;
   }
-
   * {
     scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 transparent;
+    scrollbar-color: #D1D5DB transparent;
+  }
+}
+
+/* ---------- Type-scale classes ---------- */
+/* Use these everywhere instead of raw text-xs/sm/base — they encode the
+   complete scale (size + line-height + weight) per Figma type system. */
+@layer utilities {
+  .text-h1 { font-size: var(--text-h1); line-height: var(--text-h1--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-h2 { font-size: var(--text-h2); line-height: var(--text-h2--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-h3 { font-size: var(--text-h3); line-height: var(--text-h3--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-h4 { font-size: var(--text-h4); line-height: var(--text-h4--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-h5 { font-size: var(--text-h5); line-height: var(--text-h5--line-height); font-weight: 700; letter-spacing: 0; }
+
+  .text-s1 { font-size: var(--text-s1); line-height: var(--text-s1--line-height); font-weight: 700; letter-spacing: 0; }
+  .text-s2 { font-size: var(--text-s2); line-height: var(--text-s2--line-height); font-weight: 700; letter-spacing: 0; }
+
+  .text-b1 { font-size: var(--text-b1); line-height: var(--text-b1--line-height); font-weight: 400; letter-spacing: 0; }
+  .text-b2 { font-size: var(--text-b2); line-height: var(--text-b2--line-height); font-weight: 500; letter-spacing: 0; }
+  .text-b3 { font-size: var(--text-b3); line-height: var(--text-b3--line-height); font-weight: 400; letter-spacing: 0; }
+  .text-b4 { font-size: var(--text-b4); line-height: var(--text-b4--line-height); font-weight: 500; letter-spacing: 0; }
+
+  .text-c1 { font-size: var(--text-c1); line-height: var(--text-c1--line-height); font-weight: 400; letter-spacing: 0; }
+  .text-c2 { font-size: var(--text-c2); line-height: var(--text-c2--line-height); font-weight: 500; letter-spacing: 0; }
+  .text-c3 { font-size: var(--text-c3); line-height: var(--text-c3--line-height); font-weight: 500; letter-spacing: 0; }
+
+  .text-btn-giant  { font-size: var(--text-btn-giant);  line-height: var(--text-btn-giant--line-height);  font-weight: 700; letter-spacing: 0; }
+  .text-btn-large  { font-size: var(--text-btn-large);  line-height: var(--text-btn-large--line-height);  font-weight: 400; letter-spacing: 0; }
+  .text-btn-medium { font-size: var(--text-btn-medium); line-height: var(--text-btn-medium--line-height); font-weight: 400; letter-spacing: 0; }
+}
+
+/* ---------- Premium gradient/glass surfaces ---------- */
+/* Use sparingly — primarily for hero surfaces (headers, TOTAL card).
+   Light-difference is kept small (4-8%) so it reads as premium polish,
+   not a heavy gradient. */
+@layer utilities {
+  /* Navy header bars — 135deg sweep with very subtle highlight */
+  .gradient-navy {
+    background: linear-gradient(135deg, #0B1E8A 0%, #1E3A8A 60%, #1E40AF 100%);
+  }
+  /* Dark slate header for TOTAL card / table heads */
+  .gradient-slate-dark {
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 70%, #334155 100%);
+  }
+  /* Green hero for free-items / success banners */
+  .gradient-green {
+    background: linear-gradient(135deg, #15803D 0%, #16A34A 50%, #22C55E 100%);
+  }
+  /* Yellow hero — alerts, credit approval */
+  .gradient-yellow {
+    background: linear-gradient(135deg, #FFC518 0%, #F59E0B 100%);
+  }
+  /* Sky button surface — confirm actions */
+  .gradient-sky {
+    background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%);
+  }
+  /* Subtle inner-top sheen (helps the gradient feel like a single surface
+     rather than two colours pasted together). Apply on the same element. */
+  .surface-sheen {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  }
+  /* Glass card — frosted overlay for use on dark/coloured backgrounds */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px) saturate(1.1);
+    -webkit-backdrop-filter: blur(10px) saturate(1.1);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+}
+
+/* ---------- Skeleton shimmer (loading placeholders) ---------- */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    rgba(229, 231, 235, 1) 0%,
+    rgba(243, 244, 246, 1) 50%,
+    rgba(229, 231, 235, 1) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+/* ---------- Cart row animations (CustomerDisplayScreen) ---------- */
+@keyframes cart-slide-in {
+  0%   { opacity: 0; transform: translateY(-12px) scale(0.98); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes cart-flash {
+  0%   { background-color: rgba(56, 189, 248, 0.45); box-shadow: inset 4px 0 0 0 #0EA5E9; }
+  60%  { background-color: rgba(186, 230, 253, 0.4); box-shadow: inset 4px 0 0 0 #0EA5E9; }
+  100% { background-color: transparent;              box-shadow: inset 4px 0 0 0 transparent; }
+}
+
+@layer utilities {
+  .animate-cart-in {
+    animation: cart-slide-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-cart-flash {
+    animation: cart-flash 1500ms ease-out both;
   }
 }

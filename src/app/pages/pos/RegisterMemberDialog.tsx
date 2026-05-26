@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, User, Building2, Phone, Check, AlertTriangle, AlertCircle } from 'lucide-react';
+import { X, User, Building2, Phone, Check, AlertCircle } from 'lucide-react';
 import { searchCustomers, createCustomer, apiCustomerToCustomer } from '../../../services/customersApi';
 import type { Customer } from '../../../data/customers';
 
-const NAVY = '#14264E';
-const YELLOW = '#EFB419';
+const NAVY = '#0B1E8A';
+const YELLOW = '#FFC518';
 
 interface Props {
   open: boolean;
@@ -14,24 +14,6 @@ interface Props {
 
 type CustomerType = 'personal' | 'business';
 
-function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-bold text-neutral-600">
-        {label}{required && <span className="text-rose-500 ml-0.5">*</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-const inputCls = (state: 'error' | 'warn' | 'ok' = 'ok') =>
-  `w-full h-11 px-3 border-2 rounded-xl text-sm outline-none transition ${
-    state === 'error' ? 'border-rose-400 focus:border-rose-400 bg-rose-50' :
-    state === 'warn'  ? 'border-amber-400 focus:border-amber-400 bg-amber-50/40' :
-    'border-neutral-200 focus:border-amber-400'
-  }`;
-
 export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
   const [type, setType] = useState<CustomerType>('personal');
   const [firstName, setFirstName] = useState('');
@@ -39,30 +21,31 @@ export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
   const [phone, setPhone]         = useState('');
   const [companyName, setCompanyName] = useState('');
 
-  const [errors, setErrors]                   = useState<Record<string, string>>({});
-  const [phoneDuplicate, setPhoneDuplicate]   = useState<Customer | undefined>();
-  const [similarCompanies, setSimilarCompanies] = useState<Customer[]>([]);
-  const [done, setDone]                       = useState(false);
-  const [submitting, setSubmitting]           = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [phoneDuplicate, setPhoneDuplicate] = useState<Customer | undefined>();
+  const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const companyDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const phoneDebounce   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const focusTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const firstInputRef   = useRef<HTMLInputElement>(null);
+  const phoneDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstInputRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
-    setType('personal'); setFirstName(''); setLastName('');
-    setPhone(''); setCompanyName(''); setErrors({});
-    setPhoneDuplicate(undefined); setSimilarCompanies([]); setDone(false); setSubmitting(false);
+    setType('personal');
+    setFirstName(''); setLastName('');
+    setPhone(''); setCompanyName('');
+    setErrors({});
+    setPhoneDuplicate(undefined);
+    setDone(false);
+    setSubmitting(false);
   };
 
   useEffect(() => {
     if (open) {
       focusTimerRef.current = setTimeout(() => firstInputRef.current?.focus(), 60);
     } else {
-      if (phoneDebounce.current)   clearTimeout(phoneDebounce.current);
-      if (companyDebounce.current) clearTimeout(companyDebounce.current);
-      if (focusTimerRef.current)   clearTimeout(focusTimerRef.current);
+      if (phoneDebounce.current) clearTimeout(phoneDebounce.current);
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
       reset();
     }
   }, [open]);
@@ -80,31 +63,9 @@ export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
           const dup = res.find(c => (c.phone ?? '').replace(/[-\s]/g, '') === normalized);
           if (dup) setPhoneDuplicate(apiCustomerToCustomer(dup));
         } catch {
-          // ignore — don't block registration on lookup failure
+          // ignore
         }
       }, 400);
-    }
-  };
-
-  const handleCompanyChange = (val: string) => {
-    setCompanyName(val);
-    setErrors(p => ({ ...p, companyName: '' }));
-    if (companyDebounce.current) clearTimeout(companyDebounce.current);
-    if (val.trim().length >= 2) {
-      companyDebounce.current = setTimeout(async () => {
-        try {
-          const res = await searchCustomers(val.trim());
-          const similar = res
-            .filter(c => c.type === 'company' || c.type === 'business')
-            .slice(0, 4)
-            .map(apiCustomerToCustomer);
-          setSimilarCompanies(similar);
-        } catch {
-          setSimilarCompanies([]);
-        }
-      }, 300);
-    } else {
-      setSimilarCompanies([]);
     }
   };
 
@@ -112,9 +73,12 @@ export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (type === 'business' && !companyName.trim()) e.companyName = 'กรุณากรอกชื่อบริษัท';
-    if (!firstName.trim()) e.firstName = 'กรุณากรอกชื่อ';
-    if (!lastName.trim())  e.lastName  = 'กรุณากรอกนามสกุล';
+    if (type === 'business') {
+      if (!companyName.trim()) e.companyName = 'กรุณากรอกชื่อนิติบุคคล/บริษัท';
+    } else {
+      if (!firstName.trim()) e.firstName = 'กรุณากรอกชื่อ';
+      if (!lastName.trim())  e.lastName  = 'กรุณากรอกนามสกุล';
+    }
     if (!phone.trim())     e.phone     = 'กรุณากรอกเบอร์โทร';
     else if (!/^[0-9]{9,10}$/.test(phone.replace(/[-\s]/g, '')))
       e.phone = 'รูปแบบเบอร์โทรไม่ถูกต้อง';
@@ -130,15 +94,11 @@ export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
     const fullName = type === 'business'
       ? companyName.trim()
       : `${firstName.trim()} ${lastName.trim()}`;
-    const contactPerson = type === 'business'
-      ? `${firstName.trim()} ${lastName.trim()}`
-      : undefined;
     try {
       const newCustomer = await createCustomer({
         name: fullName,
         phone: phone.trim(),
         type: type === 'business' ? 'company' : 'person',
-        ...(contactPerson ? { contactPerson } : {}),
       });
       setDone(true);
       setTimeout(() => { onRegistered(apiCustomerToCustomer(newCustomer)); handleClose(); }, 1100);
@@ -152,151 +112,158 @@ export function RegisterMemberDialog({ open, onClose, onRegistered }: Props) {
 
   if (!open) return null;
 
-  const phoneState = errors.phone ? 'error' : phoneDuplicate ? 'error' : 'ok';
-  const companyState = errors.companyName ? 'error' : similarCompanies.length > 0 ? 'warn' : 'ok';
+  const inputCls = (hasError: boolean) =>
+    `w-full h-12 px-4 border rounded-[12px] text-b3 text-text-primary placeholder:text-gray-400 outline-none transition ${
+      hasError
+        ? 'border-status-danger/60 focus:border-status-danger bg-status-danger-bg/30'
+        : 'border-gray-300 focus:border-brand-navy'
+    }`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={handleClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[500px] mx-4 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
-          <div>
-            <div className="text-lg font-bold" style={{ color: NAVY }}>สมัครสมาชิกใหม่</div>
-            <div className="text-xs text-neutral-400 mt-0.5">กรอกข้อมูลเบื้องต้นเพื่อเริ่มต้นสะสมคะแนน</div>
-          </div>
-          <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-neutral-100 text-neutral-400 transition">
-            <X className="w-4 h-4" />
+      <div className="relative bg-white rounded-[12px] shadow-2xl w-full max-w-[900px] mx-4 flex flex-col max-h-[90vh] overflow-hidden">
+
+        {/* Navy header bar */}
+        <div className="flex items-center justify-between px-6 h-14 shrink-0" style={{ backgroundColor: NAVY }}>
+          <div className="text-h5 text-white">สมัครสมาชิกใหม่</div>
+          <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-[12px] hover:bg-white/10 text-white transition" aria-label="ปิด">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-5 flex flex-col gap-5">
-          {/* Type toggle */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-neutral-100 rounded-xl">
+        {/* Tabs (segmented pill — sky blue active) */}
+        <div className="px-6 pt-5 shrink-0">
+          <div className="grid grid-cols-2 gap-1 p-1 bg-sky-100 rounded-full">
             {([
-              { value: 'personal', label: 'ลูกค้าทั่วไป',  icon: User },
-              { value: 'business', label: 'ลูกค้าธุรกิจ', icon: Building2 },
-            ] as const).map(({ value, label, icon: Icon }) => (
-              <button key={value} onClick={() => { setType(value); setErrors({}); setSimilarCompanies([]); }}
-                className={`flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-bold transition ${
-                  type === value ? 'bg-white shadow-sm text-neutral-900' : 'text-neutral-400 hover:text-neutral-600'}`}
-              >
-                <Icon className="w-4 h-4" />{label}
-              </button>
-            ))}
+              { value: 'personal', label: 'บุคคลธรรมดา', icon: User },
+              { value: 'business', label: 'นิติบุคคล',    icon: Building2 },
+            ] as const).map(({ value, label, icon: Icon }) => {
+              const active = type === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => { setType(value); setErrors({}); }}
+                  className={`flex items-center justify-center gap-2 h-11 rounded-full text-b4 font-semibold transition ${
+                    active
+                      ? 'bg-sky-500 text-white shadow-sm'
+                      : 'bg-white text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" /> {label}
+                </button>
+              );
+            })}
           </div>
+        </div>
 
-          {type === 'business' && (
-            <Field label="ชื่อบริษัท / ร้านค้า" required>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
-                <input
-                  ref={firstInputRef}
-                  value={companyName}
-                  onChange={e => handleCompanyChange(e.target.value)}
-                  placeholder="เช่น บริษัท ABC จำกัด"
-                  className={`${inputCls(companyState)} pl-9`}
-                />
-                {companyState === 'warn' && (
-                  <AlertTriangle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500 pointer-events-none" />
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
+          {type === 'personal' ? (
+            <>
+              {/* ชื่อ + นามสกุล */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-c1 text-text-secondary">ชื่อ</label>
+                  <input
+                    ref={firstInputRef}
+                    value={firstName}
+                    onChange={e => { setFirstName(e.target.value); setErrors(p => ({ ...p, firstName: '' })); }}
+                    placeholder="กรอกชื่อ"
+                    className={inputCls(!!errors.firstName)}
+                  />
+                  {errors.firstName && (
+                    <p className="flex items-center gap-1 text-c2 text-status-danger"><AlertCircle className="w-4 h-4" />{errors.firstName}</p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-c1 text-text-secondary">นามสกุล</label>
+                  <input
+                    value={lastName}
+                    onChange={e => { setLastName(e.target.value); setErrors(p => ({ ...p, lastName: '' })); }}
+                    placeholder="กรอกนามสกุล"
+                    className={inputCls(!!errors.lastName)}
+                  />
+                  {errors.lastName && (
+                    <p className="flex items-center gap-1 text-c2 text-status-danger"><AlertCircle className="w-4 h-4" />{errors.lastName}</p>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* ชื่อนิติบุคคล/บริษัท */}
+              <div className="flex flex-col gap-2">
+                <label className="text-c1 text-text-secondary">ชื่อนิติบุคคล/บริษัท</label>
+                <div className="relative">
+                  <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  <input
+                    ref={firstInputRef}
+                    value={companyName}
+                    onChange={e => { setCompanyName(e.target.value); setErrors(p => ({ ...p, companyName: '' })); }}
+                    placeholder="กรอกชื่อนิติบุคคล/บริษัท"
+                    className={`${inputCls(!!errors.companyName)} pl-12`}
+                  />
+                </div>
+                {errors.companyName && (
+                  <p className="flex items-center gap-1 text-c2 text-status-danger"><AlertCircle className="w-4 h-4" />{errors.companyName}</p>
                 )}
               </div>
-              {errors.companyName && (
-                <p className="flex items-center gap-1 text-xs text-rose-500"><AlertCircle className="w-3.5 h-3.5" />{errors.companyName}</p>
-              )}
-              {similarCompanies.length > 0 && !errors.companyName && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-700 mb-2">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    พบชื่อที่คล้ายกันในระบบ — ตรวจสอบก่อนสมัครใหม่
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    {similarCompanies.map(c => (
-                      <div key={c.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-100">
-                        <div>
-                          <div className="text-xs font-bold text-neutral-800">{c.name}</div>
-                          <div className="text-[11px] text-neutral-500">{c.phone} • {c.code}</div>
-                        </div>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
-                          {c.type === 'company' ? 'ธุรกิจ' : 'บุคคล'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </Field>
+            </>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={type === 'business' ? 'ชื่อผู้ติดต่อ' : 'ชื่อ'} required>
-              <input
-                ref={type === 'personal' ? firstInputRef : undefined}
-                value={firstName}
-                onChange={e => { setFirstName(e.target.value); setErrors(p => ({ ...p, firstName: '' })); }}
-                placeholder="ชื่อ"
-                className={inputCls(errors.firstName ? 'error' : 'ok')}
-              />
-              {errors.firstName && <p className="text-xs text-rose-500">{errors.firstName}</p>}
-            </Field>
-            <Field label="นามสกุล" required>
-              <input
-                value={lastName}
-                onChange={e => { setLastName(e.target.value); setErrors(p => ({ ...p, lastName: '' })); }}
-                placeholder="นามสกุล"
-                className={inputCls(errors.lastName ? 'error' : 'ok')}
-              />
-              {errors.lastName && <p className="text-xs text-rose-500">{errors.lastName}</p>}
-            </Field>
-          </div>
-
-          <Field label="เบอร์โทรศัพท์" required>
+          {/* เบอร์โทร — common to both */}
+          <div className="flex flex-col gap-2">
+            <label className="text-c1 text-text-secondary">เบอร์โทร</label>
             <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
               <input
                 type="tel"
                 value={phone}
                 onChange={e => handlePhoneChange(e.target.value)}
-                placeholder="089-123-4567"
-                className={`${inputCls(phoneState)} pl-9`}
+                placeholder="กรอกเบอร์โทร เช่น 089-123-4567"
+                className={`${inputCls(!!errors.phone || !!phoneDuplicate)} pl-12`}
               />
-              {phoneDuplicate && !errors.phone && (
-                <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-400 pointer-events-none" />
-              )}
             </div>
             {phoneDuplicate && (
-              <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5">
-                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 rounded-[12px] border border-status-danger/30 bg-status-danger-bg px-4 py-3">
+                <AlertCircle className="w-5 h-5 text-status-danger shrink-0 mt-0.5" />
                 <div>
-                  <div className="text-xs font-bold text-rose-700">เบอร์นี้มีในระบบแล้ว</div>
-                  <div className="text-[11px] text-rose-600 mt-0.5">
-                    {phoneDuplicate.name} ({phoneDuplicate.code}) •{' '}
-                    <span className="font-semibold">{phoneDuplicate.tier}</span>
+                  <div className="text-c1 font-bold text-status-danger">เบอร์นี้มีในระบบแล้ว</div>
+                  <div className="text-c2 text-status-danger/80 mt-0.5">
+                    {phoneDuplicate.name} ({phoneDuplicate.code}) — <span className="font-semibold">{phoneDuplicate.tier}</span>
                   </div>
                 </div>
               </div>
             )}
             {errors.phone && !phoneDuplicate && (
-              <p className="flex items-center gap-1 text-xs text-rose-500"><AlertCircle className="w-3.5 h-3.5" />{errors.phone}</p>
+              <p className="flex items-center gap-1 text-c2 text-status-danger"><AlertCircle className="w-4 h-4" />{errors.phone}</p>
             )}
-          </Field>
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-neutral-100 flex items-center gap-3">
-          <button onClick={handleClose}
-            className="flex-1 h-11 rounded-xl border-2 border-neutral-200 text-sm font-bold text-neutral-600 hover:bg-neutral-50 transition">
+        <div className="px-6 py-4 border-t border-gray-200 bg-bg-page flex items-center gap-3 shrink-0">
+          <button
+            onClick={handleClose}
+            className="flex-1 h-12 rounded-[12px] border border-gray-300 bg-white text-h5 text-text-primary hover:bg-bg-page-2 transition"
+          >
             ยกเลิก
           </button>
-          <button onClick={handleSubmit} disabled={done || !!phoneDuplicate || submitting}
-            className="flex-1 h-11 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-            style={{ backgroundColor: done ? '#22c55e' : YELLOW, color: done ? 'white' : NAVY }}>
-            {done
-              ? <><Check className="w-4 h-4" /> สมัครสำเร็จ!</>
-              : submitting
-                ? <span className="inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                : 'สมัครสมาชิก'}
+          <button
+            onClick={handleSubmit}
+            disabled={done || !!phoneDuplicate || submitting}
+            className="flex-[2] h-12 rounded-[12px] flex items-center justify-center gap-2 text-h5 transition hover:brightness-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            style={{ backgroundColor: done ? '#27AE60' : YELLOW, color: done ? '#FFFFFF' : NAVY }}
+          >
+            {done ? (
+              <><Check className="w-5 h-5" /> สมัครสำเร็จ!</>
+            ) : submitting ? (
+              <span className="inline-block w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <>Enter - ตกลง</>
+            )}
           </button>
         </div>
       </div>

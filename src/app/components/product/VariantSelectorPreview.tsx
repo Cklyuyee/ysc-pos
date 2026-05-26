@@ -166,19 +166,19 @@ export function VariantSelectorPreview({
           <Package className="h-9 w-9 text-slate-400" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-slate-500 font-medium mb-0.5">Preview — Website</p>
+          <p className="text-c3 text-slate-500 font-medium mb-0.5">Preview — Website</p>
           <h3 className="font-semibold text-slate-800 leading-snug">
             {resolvedItem?.name ?? productName}
           </h3>
           {resolvedItem ? (
             <div className="mt-1 flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold text-brand-navy">
+              <span className="text-h5 font-bold text-brand-navy">
                 {formatCurrency(resolvedItem.price)}
               </span>
-              <span className="text-sm text-slate-500">/ {resolvedItem.unit}</span>
+              <span className="text-c3 text-slate-500">/ {resolvedItem.unit}</span>
             </div>
           ) : (
-            <div className="mt-1 text-sm text-slate-400">
+            <div className="mt-1 text-c3 text-slate-400">
               เลือก{choices[0]?.label ?? 'ตัวเลือก'}เพื่อดูราคา
             </div>
           )}
@@ -189,11 +189,11 @@ export function VariantSelectorPreview({
       {choices.map((choice, dimIdx) => (
         <div key={dimIdx}>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm font-semibold text-slate-700">
+            <span className="text-c3 font-semibold text-slate-700">
               ตัวเลือก {dimIdx + 1} — {choice.label}
             </span>
             {selectedC[dimIdx] !== null && (
-              <Badge variant="outline" className="bg-brand-primary/10 text-brand-primary border-brand-primary/30 text-xs">
+              <Badge variant="outline" className="bg-brand-primary/10 text-brand-primary border-brand-primary/30 text-c3">
                 {selectedC[dimIdx]}
               </Badge>
             )}
@@ -208,7 +208,7 @@ export function VariantSelectorPreview({
                   key={val}
                   onClick={() => available && handleSelect(dimIdx, val)}
                   disabled={!available}
-                  className={`relative px-3 py-1.5 rounded-lg border text-sm font-medium transition-all
+                  className={`relative px-3 py-1.5 rounded-lg border text-c3 font-medium transition-all
                     ${selected
                       ? 'bg-brand-primary text-white border-brand-primary shadow-sm'
                       : !available
@@ -235,9 +235,9 @@ export function VariantSelectorPreview({
       {unitIsChoice ? (
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm font-semibold text-slate-700">หน่วย</span>
+            <span className="text-c3 font-semibold text-slate-700">หน่วย</span>
             {selectedUnit && (
-              <Badge variant="outline" className="bg-brand-primary/10 text-brand-primary border-brand-primary/30 text-xs">
+              <Badge variant="outline" className="bg-brand-primary/10 text-brand-primary border-brand-primary/30 text-c3">
                 {selectedUnit}
               </Badge>
             )}
@@ -252,7 +252,7 @@ export function VariantSelectorPreview({
                   key={unit}
                   onClick={() => available && handleSelectUnit(unit)}
                   disabled={!available}
-                  className={`relative px-3 py-1.5 rounded-lg border text-sm font-medium transition-all
+                  className={`relative px-3 py-1.5 rounded-lg border text-c3 font-medium transition-all
                     ${selected
                       ? 'bg-brand-primary text-white border-brand-primary shadow-sm'
                       : !available
@@ -273,8 +273,8 @@ export function VariantSelectorPreview({
         </div>
       ) : fixedUnit && (
         <div className="flex items-center gap-3 pt-1">
-          <span className="text-sm font-semibold text-slate-700 w-20 flex-shrink-0">หน่วย</span>
-          <div className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-sm font-medium text-slate-700">
+          <span className="text-c3 font-semibold text-slate-700 w-20 flex-shrink-0">หน่วย</span>
+          <div className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-c3 font-medium text-slate-700">
             {fixedUnit}
           </div>
         </div>
@@ -283,17 +283,17 @@ export function VariantSelectorPreview({
       {/* SKU + Barcode + stock info */}
       {resolvedItem && (
         <div className="bg-slate-50 rounded-lg p-3 space-y-1.5">
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-c3">
             <span className="text-slate-500">SKU</span>
             <span className="font-mono font-semibold text-slate-800">{resolvedItem.sku}</span>
           </div>
           {resolvedItem.barcode && (
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-c3">
               <span className="text-slate-500">Barcode</span>
               <span className="font-mono font-semibold text-slate-800">{resolvedItem.barcode}</span>
             </div>
           )}
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-c3">
             <span className="text-slate-500">สต็อก</span>
             {resolvedItem.stock === 0
               ? <span className="text-amber-600 font-semibold">Pre-Order (ไม่มีสต็อก)</span>

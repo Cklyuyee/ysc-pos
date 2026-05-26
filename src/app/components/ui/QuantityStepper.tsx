@@ -95,7 +95,7 @@ export function QuantityStepper({
           '[&::-webkit-inner-spin-button]:appearance-none',
           '[&::-webkit-outer-spin-button]:appearance-none',
           'disabled:cursor-not-allowed',
-          sm ? 'w-10 text-sm' : 'w-12 text-sm',
+          sm ? 'w-10 text-c3' : 'w-12 text-c3',
         )}
       />
 

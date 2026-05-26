@@ -32,6 +32,8 @@ export interface Address {
   type: AddressType;           // Billing or Shipping address
   label: string;               // "ที่อยู่หลัก" or "สาขา"
   branchName?: string;         // e.g., "สาขาสระแก้ว"
+  contactName?: string;        // recipient name on the shipping label
+  phone?: string;              // recipient phone (used as the courier contact)
   address: string;
   district: string;
   province: string;
@@ -175,6 +177,11 @@ export interface Customer {
 
   // Document Settings
   docType?: 'Y (Full VAT)' | 'N (No VAT)' | 'M (Mixed V/I)' | 'A (Abbreviated)';
+
+  // Account status — drives credit / blacklist UI gates
+  // (Common values: "active" | "suspended" | "blacklist" — kept as string so
+  //  unexpected backend values still flow through without crashing the UI.)
+  status?: string;
 
   // Sales Representative
   salesRep?: {

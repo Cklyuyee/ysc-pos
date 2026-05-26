@@ -1,4 +1,6 @@
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'
+// In dev, browser calls go to `/api` (Vite proxies to VITE_API_URL backend).
+// In production, set VITE_API_URL to the absolute API URL.
+const BASE = import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL ?? '/api')
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const method = init?.method ?? 'GET'
