@@ -57,9 +57,22 @@ export interface DisplayIdleState {
   type: 'idle'
 }
 
+/** Shown briefly after checkout — "ขอบคุณที่ใช้บริการ" + order code. */
+export interface DisplayThankYouState {
+  type: 'thank-you'
+  /** Order id / number to display under the thank-you message. */
+  orderId: string
+  /** Total amount paid (THB). */
+  grand: number
+  /** Customer name if selected (optional). */
+  customerName?: string
+  /** Earned/total reward points for this customer (optional). */
+  earnedPoints?: number
+}
+
 /** Sent by CustomerDisplayScreen on mount to request an immediate state snapshot from POSScreen. */
 export interface DisplayPingMessage {
   type: 'ping'
 }
 
-export type DisplayMessage = DisplayCartState | DisplayIdleState | DisplayPingMessage
+export type DisplayMessage = DisplayCartState | DisplayIdleState | DisplayThankYouState | DisplayPingMessage

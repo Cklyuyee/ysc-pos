@@ -17,6 +17,18 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      // Pin a single React instance for the entire dep graph. Without this,
+      // Vite's lazy optimizer can occasionally hand a different cached React
+      // copy to dynamically-imported chunks (e.g. jspdf/html2canvas worker
+      // helpers), which triggers "Invalid hook call / useState is null" in
+      // components that load BEFORE the dynamic chunk resolves.
+      dedupe: ['react', 'react-dom'],
+    },
+    optimizeDeps: {
+      // Pre-bundle these heavy libs up-front so Vite doesn't re-optimize on
+      // first user click — that mid-flight re-optimization is what corrupted
+      // React's single-instance invariant after `npm install`.
+      include: ['jspdf', 'html2canvas'],
     },
     server: {
       port: 5174,

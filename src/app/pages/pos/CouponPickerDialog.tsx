@@ -11,11 +11,11 @@ export interface CouponItem {
   detail: string;
   color: 'sky' | 'red' | 'green' | 'amber' | 'orange' | 'teal' | 'blue' | 'purple';
   minPurchase?: number;
-  /** Days until expiry — when ≤ 15, card shows red near-expiry warning */
+  /** Days until expiry — when < NEAR_EXPIRY_DAYS, card shows red near-expiry warning */
   daysUntilExpiry?: number;
 }
 
-/** Threshold (days) under which a coupon is marked as near-expiry. */
+/** Threshold (days). Coupons with daysUntilExpiry STRICTLY LESS THAN this are warned. */
 export const NEAR_EXPIRY_DAYS = 30;
 
 const COLOR_BG: Record<CouponItem['color'], string> = {
@@ -100,7 +100,7 @@ export function CouponPickerDialog({ open, onClose, coupons, applied, cartTotal 
         <div className="p-5 space-y-3 overflow-y-auto bg-white flex-1 min-h-0">
           {displayedCoupons.map((coupon) => {
             const isSelected = selected.includes(coupon.id);
-            const isNearExpiry = coupon.daysUntilExpiry !== undefined && coupon.daysUntilExpiry <= NEAR_EXPIRY_DAYS;
+            const isNearExpiry = coupon.daysUntilExpiry !== undefined && coupon.daysUntilExpiry < NEAR_EXPIRY_DAYS;
             const reason = disabledReason(coupon);
             const isDisabled = !isSelected && reason !== null;
             const cardClass = isDisabled

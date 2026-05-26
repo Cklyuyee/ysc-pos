@@ -38,6 +38,7 @@ import { SlipUploadDialog } from './SlipUploadDialog';
 import OtherMenusDialog from './OtherMenusDialog';
 import DeliveryDocDialog from './DeliveryDocDialog';
 import CreateInvoiceDialog from './CreateInvoiceDialog';
+import PreparationSlipDialog, { type PrepSlipItem } from './PreparationSlipDialog';
 import { ProductSearchDialog } from '../../components/product/ProductSearchDialog';
 import { ProductThumb } from '../../components/ui/ProductThumb';
 import type { Product as MockProduct } from '../../api/mock/products';
@@ -690,6 +691,25 @@ export default function POSScreen() {
   const [showBillIntercept, setShowBillIntercept] = useState(false);
   /** Final "Order placed" success popup shown after the cashier confirms the bill. */
   const [showOrderSuccess, setShowOrderSuccess] = useState(false);
+  const [showPrepSlip, setShowPrepSlip] = useState(false);
+  /** When true, opening the prep slip dialog triggers silent PDF download. */
+  const [prepSlipAutoDownload, setPrepSlipAutoDownload] = useState(false);
+  /**
+   * Snapshot captured the moment the order-success dialog opens. The prep-slip
+   * dialog renders against this snapshot so docNumber / dateTime / items stay
+   * stable even if cartItems are cleared on next checkout.
+   */
+  const [prepSlipSnapshot, setPrepSlipSnapshot] = useState<{
+    docNumber: string;
+    dateTime: Date;
+    items: PrepSlipItem[];
+    customerName: string;
+    customerCode?: string;
+    customerAddress?: string;
+    subtotal: number;
+    vat: number;
+    netTotal: number;
+  } | null>(null);
   const [showRegister, setShowRegister] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
@@ -703,6 +723,7 @@ export default function POSScreen() {
   const [pendingQty, setPendingQty] = useState(1);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [apiLoading, setApiLoading] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [showSlipUpload, setShowSlipUpload] = useState(false);
@@ -942,6 +963,11 @@ export default function POSScreen() {
   const showError = (msg: string) => {
     setErrorMsg(msg);
     setTimeout(() => setErrorMsg(''), 8000);
+  };
+
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(''), 4000);
   };
 
   const handleSuggestionPick = async (product: ApiProduct) => {
@@ -1188,6 +1214,18 @@ export default function POSScreen() {
         setPendingSlipAmount(grand);
         setShowSlipUpload(true);
       } else {
+        // Show "ขอบคุณที่ใช้บริการ" on the customer display.
+        // Stays visible until the next scan resets the cart state.
+        const ch = displayChannelRef.current;
+        if (ch && orderId) {
+          ch.postMessage({
+            type: 'thank-you',
+            orderId,
+            grand,
+            customerName: customer?.name,
+            earnedPoints: Math.floor(grand / 1500),
+          } satisfies DisplayMessage);
+        }
         const fresh = await createCart();
         applyCartResponse(fresh);
         setCustomer(null);
@@ -1199,6 +1237,17 @@ export default function POSScreen() {
   };
 
   const handleSlipUploaded = async () => {
+    // Broadcast thank-you BEFORE clearing customer/cart state (we need them).
+    const ch = displayChannelRef.current;
+    if (ch && pendingSlipOrderId) {
+      ch.postMessage({
+        type: 'thank-you',
+        orderId: pendingSlipOrderId,
+        grand: pendingSlipAmount,
+        customerName: customer?.name,
+        earnedPoints: Math.floor(pendingSlipAmount / 1500),
+      } satisfies DisplayMessage);
+    }
     setShowSlipUpload(false);
     setPendingSlipOrderId(null);
     try {
@@ -1753,6 +1802,39 @@ export default function POSScreen() {
           onConfirm: () => {
             setShowFulfillmentSummary(false);
             setShowFulfillmentSummaryFull(false);
+            // Snapshot cart for the digital preparation slip BEFORE checkout clears it.
+            const snapDate = new Date();
+            const yr = snapDate.getFullYear();
+            const seq = Math.floor(Math.random() * 9000000 + 1000000); // mock 7-digit sequence
+            const slipItems: PrepSlipItem[] = cartItems.map(it => {
+              const p = productMap.get(it.sku);
+              const price = parseFloat(it.unitPrice);
+              return {
+                sku: it.sku,
+                barcode: p?.barcode ?? it.sku,
+                name: p?.name ?? it.sku,
+                qty: it.qty,
+                unit: p?.unit ?? 'ชิ้น',
+                unitPrice: price,
+                total: price * it.qty,
+              };
+            });
+            const subtotalAmt = slipItems.reduce((s, i) => s + i.total, 0);
+            const vatAmt = Math.round((subtotalAmt * 7 / 107) * 100) / 100; // VAT-included assumption
+            const addrParts = selectedAddress
+              ? [selectedAddress.address, selectedAddress.district, selectedAddress.province, selectedAddress.postalCode].filter(Boolean)
+              : [];
+            setPrepSlipSnapshot({
+              docNumber: `S${yr}${seq}`,
+              dateTime: snapDate,
+              items: slipItems,
+              customerName: customer?.name ?? 'ลูกค้าทั่วไป (Walk-in)',
+              customerCode: customer?.code,
+              customerAddress: addrParts.length ? addrParts.join(' ') : undefined,
+              subtotal: subtotalAmt,
+              vat: vatAmt,
+              netTotal: netTotal,
+            });
             setShowOrderSuccess(true);
           },
           onScanMore: () => {
@@ -2026,9 +2108,10 @@ export default function POSScreen() {
                   </div>
                 </div>
 
-                {/* Yellow doc button */}
+                {/* Yellow doc button — opens the digital preparation slip */}
                 <button
                   type="button"
+                  onClick={() => setShowPrepSlip(true)}
                   className="w-full h-14 rounded-[12px] flex items-center justify-center gap-2 text-h5 font-bold transition hover:brightness-95"
                   style={{ backgroundColor: YELLOW, color: NAVY }}
                 >
@@ -2037,28 +2120,48 @@ export default function POSScreen() {
                 </button>
               </div>
 
-              {/* Footer 3 actions */}
+              {/* Footer 3 actions
+                  - บันทึก       → silently download prep slip as PDF (no print dialog)
+                  - บันทึก+พิมพ์ → open prep slip + invoke browser print (physical printer)
+                  - ปิดหน้าต่าง  → close + ready for the next bill (cart was already reset on checkout) */}
               <div className="px-6 py-4 border-t border-gray-200 grid grid-cols-3 gap-3 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowOrderSuccess(false)}
-                  className="h-12 rounded-[12px] border border-gray-300 bg-white text-c1 text-text-primary hover:bg-bg-page-2 transition flex items-center justify-center gap-2"
+                  onClick={() => {
+                    // Silent PDF save — mounts the slip dialog with autoDownload=true.
+                    // The dialog captures itself via html2canvas → jsPDF → triggers a
+                    // browser download, then fires onDownloaded to dismiss everything.
+                    setShowOrderSuccess(false);
+                    setPrepSlipAutoDownload(true);
+                    setShowPrepSlip(true);
+                  }}
+                  className="h-12 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-bg-page-2 transition flex items-center justify-center gap-2"
                 >
                   <Save className="w-4 h-4" />
                   บันทึก
                 </button>
                 <button
                   type="button"
-                  onClick={() => { window.print(); setShowOrderSuccess(false); }}
-                  className="h-12 rounded-[12px] border border-gray-300 bg-white text-c1 text-text-primary hover:bg-bg-page-2 transition flex items-center justify-center gap-2"
+                  onClick={() => {
+                    setShowOrderSuccess(false);
+                    setShowPrepSlip(true);
+                    setTimeout(() => window.print(), 250);
+                    showSuccess(`บันทึกและสั่งพิมพ์ใบเตรียมสินค้า ${prepSlipSnapshot?.docNumber ?? orderNumber} แล้ว`);
+                  }}
+                  className="h-12 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-bg-page-2 transition flex items-center justify-center gap-2"
                 >
                   <Printer className="w-4 h-4" />
                   บันทึก+พิมพ์
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowOrderSuccess(false)}
-                  className="h-12 rounded-[12px] border border-rose-200 bg-white text-c1 text-rose-500 hover:bg-rose-50 transition flex items-center justify-center gap-2"
+                  onClick={() => {
+                    // Cart was already reset by handlePaymentConfirm/handleSlipUploaded.
+                    // Closing the dialog leaves cashier on an empty cart ready for the next bill.
+                    setShowOrderSuccess(false);
+                    barcodeRef.current?.focus();
+                  }}
+                  className="h-12 rounded-[12px] border border-rose-200 bg-white text-s2 text-rose-500 hover:bg-rose-50 transition flex items-center justify-center gap-2"
                 >
                   <XCircle className="w-4 h-4" />
                   ปิดหน้าต่าง
@@ -2093,6 +2196,33 @@ export default function POSScreen() {
         open={showDeliveryDoc}
         onClose={() => setShowDeliveryDoc(false)}
       />
+
+      {prepSlipSnapshot && (
+        <PreparationSlipDialog
+          open={showPrepSlip}
+          onClose={() => { setShowPrepSlip(false); setPrepSlipAutoDownload(false); }}
+          docNumber={prepSlipSnapshot.docNumber}
+          dateTime={prepSlipSnapshot.dateTime}
+          cashierName={me?.name ?? 'CASHIER'}
+          posMachine="POS-001"
+          customer={{
+            code: prepSlipSnapshot.customerCode,
+            name: prepSlipSnapshot.customerName,
+            address: prepSlipSnapshot.customerAddress,
+            docType: '(Y)',
+          }}
+          items={prepSlipSnapshot.items}
+          subtotal={prepSlipSnapshot.subtotal}
+          vat={prepSlipSnapshot.vat}
+          netTotal={prepSlipSnapshot.netTotal}
+          autoDownloadPdf={prepSlipAutoDownload}
+          onDownloaded={() => {
+            setPrepSlipAutoDownload(false);
+            setShowPrepSlip(false);
+            showSuccess(`บันทึกใบเตรียมสินค้า ${prepSlipSnapshot.docNumber}.pdf เรียบร้อยแล้ว`);
+          }}
+        />
+      )}
 
       <CreateInvoiceDialog
         open={showCreateInvoice}
@@ -2376,6 +2506,12 @@ export default function POSScreen() {
               <div className="mt-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-c3 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 {errorMsg}
+              </div>
+            )}
+            {successMsg && (
+              <div className="mt-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-c3 flex items-center gap-2">
+                <BadgeCheck className="w-4 h-4 shrink-0" />
+                {successMsg}
               </div>
             )}
           </div>
@@ -3128,8 +3264,9 @@ export default function POSScreen() {
                 sky: '#0EA5E9', red: '#EF4444', green: '#22C55E',
                 amber: '#F59E0B', orange: '#F97316', teal: '#14B8A6', blue: '#3B82F6', purple: '#A855F7',
               };
+              // Warn only coupons with STRICTLY LESS THAN NEAR_EXPIRY_DAYS days remaining.
               const isNear = (c: { daysUntilExpiry?: number }) =>
-                c.daysUntilExpiry !== undefined && c.daysUntilExpiry <= NEAR_EXPIRY_DAYS;
+                c.daysUntilExpiry !== undefined && c.daysUntilExpiry < NEAR_EXPIRY_DAYS;
               const cartTotal = totals.grand;
               const reasonFor = (c: { id: string; amount: number; minPurchase?: number }): string | null => {
                 if (c.minPurchase != null && cartTotal < c.minPurchase) return 'ยอดซื้อยังไม่ถึงขั้นต่ำ';

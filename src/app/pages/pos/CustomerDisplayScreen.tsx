@@ -1,9 +1,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Crown, Tag } from 'lucide-react';
+import { Crown, Tag, BadgeCheck, Star } from 'lucide-react';
 import {
   DISPLAY_CHANNEL,
   type DisplayMessage,
   type DisplayCartState,
+  type DisplayThankYouState,
   type DisplayPingMessage,
 } from '../../../services/customerDisplayChannel';
 import { ProductThumb } from '../../components/ui/ProductThumb';
@@ -398,19 +399,122 @@ const FreeItemsCard = memo(function FreeItemsCard({
 
 const EMPTY_ARRAY: never[] = [];
 
+// ─── Thank-you overlay (shown after checkout) ──────────────────────────────────
+const ThankYouOverlay = memo(function ThankYouOverlay({
+  data,
+}: {
+  data: DisplayThankYouState;
+}) {
+  return (
+    <div
+      className="absolute inset-0 z-50 flex flex-col items-center justify-center px-8 animate-cart-in"
+      style={{ backgroundColor: NAVY }}
+    >
+      {/* Big checkmark badge */}
+      <div
+        className="flex items-center justify-center rounded-full mb-8"
+        style={{
+          width: 160,
+          height: 160,
+          backgroundColor: YELLOW,
+          boxShadow: '0 8px 32px rgba(255, 197, 24, 0.4)',
+        }}
+      >
+        <BadgeCheck className="w-24 h-24" style={{ color: NAVY }} strokeWidth={2.5} />
+      </div>
+
+      {/* Thank-you headline */}
+      <div className="text-center mb-3">
+        <div className="text-white font-bold tracking-wide" style={{ fontSize: 72, lineHeight: 1.1 }}>
+          ขอบคุณที่ใช้บริการ
+        </div>
+      </div>
+
+      {data.customerName && (
+        <div className="text-white/80 text-3xl font-medium mb-8">
+          คุณ {data.customerName}
+        </div>
+      )}
+
+      {/* Order detail card */}
+      <div
+        className="bg-white rounded-[20px] shadow-2xl px-12 py-8 min-w-[520px]"
+        style={{ marginTop: data.customerName ? 0 : 24 }}
+      >
+        <div className="text-center mb-6">
+          <div className="text-text-muted text-lg mb-1">เลขที่คำสั่งซื้อ</div>
+          <div
+            className="font-bold tabular-nums tracking-wider"
+            style={{ color: NAVY, fontSize: 40 }}
+          >
+            {data.orderId}
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 pt-5 text-center">
+          <div className="text-text-muted text-lg mb-1">ยอดชำระสุทธิ</div>
+          <div
+            className="font-black tabular-nums leading-none"
+            style={{ color: NAVY, fontSize: 56 }}
+          >
+            {fmt(data.grand)}
+          </div>
+        </div>
+
+        {data.earnedPoints != null && data.earnedPoints > 0 && (
+          <div
+            className="mt-6 pt-5 border-t border-gray-200 flex items-center justify-center gap-2"
+          >
+            <Star className="w-6 h-6" style={{ color: YELLOW, fill: YELLOW }} />
+            <span className="text-xl text-text-secondary">
+              คะแนนสะสมที่ได้รับ
+            </span>
+            <span
+              className="text-2xl font-bold tabular-nums"
+              style={{ color: NAVY }}
+            >
+              {data.earnedPoints.toLocaleString('th-TH')} คะแนน
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Tagline */}
+      <div className="mt-10 text-white/70 text-xl">
+        แล้วพบกันใหม่ — ยงเจริญเครื่องเขียน
+      </div>
+    </div>
+  );
+});
+
 // ─── Main screen ───────────────────────────────────────────────────────────────
 export default function CustomerDisplayScreen() {
   const [cartState,    setCartState]    = useState<DisplayCartState | null>(null);
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [lastSku,      setLastSku]      = useState<string | null>(null);
   const [connected,    setConnected]    = useState(false);
+  const [thankYou,     setThankYou]     = useState<DisplayThankYouState | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const thankYouTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const ch = new BroadcastChannel(DISPLAY_CHANNEL);
     ch.postMessage({ type: 'ping' } satisfies DisplayPingMessage);
     ch.onmessage = (e: MessageEvent<DisplayMessage>) => {
       setConnected(true);
+      if (e.data.type === 'thank-you') {
+        const ty = e.data as DisplayThankYouState;
+        setThankYou(ty);
+        // Clear cart immediately so we go back to a clean idle state behind the overlay.
+        setCartState(null);
+        setCustomerInfo(null);
+        setLastSku(null);
+        if (thankYouTimerRef.current) clearTimeout(thankYouTimerRef.current);
+        // Auto-dismiss after 10 seconds — POSScreen will start broadcasting a fresh
+        // (empty) cart for the next customer; we just hide the overlay.
+        thankYouTimerRef.current = setTimeout(() => setThankYou(null), 10000);
+        return;
+      }
       if (e.data.type === 'idle') {
         setCartState(null);
         setCustomerInfo(null);
@@ -419,6 +523,12 @@ export default function CustomerDisplayScreen() {
       }
       if (e.data.type === 'cart-update') {
         const d = e.data as DisplayCartState;
+        // A new scan arrived — close any lingering thank-you overlay so the next
+        // customer's cart is visible immediately.
+        if (d.items.length > 0) {
+          if (thankYouTimerRef.current) clearTimeout(thankYouTimerRef.current);
+          setThankYou(null);
+        }
         // Update customer info only when values actually change
         setCustomerInfo(prev => {
           if (
@@ -465,6 +575,7 @@ export default function CustomerDisplayScreen() {
     return () => {
       ch.close();
       if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+      if (thankYouTimerRef.current) clearTimeout(thankYouTimerRef.current);
     };
   }, []);
 
@@ -479,9 +590,11 @@ export default function CustomerDisplayScreen() {
 
   return (
     <div
-      className="h-screen flex flex-col overflow-hidden"
+      className="h-screen flex flex-col overflow-hidden relative"
       style={{ fontFamily: 'inherit', backgroundColor: NAVY }}
     >
+      {/* ─── Thank-you overlay (covers entire screen) ─── */}
+      {thankYou && <ThankYouOverlay data={thankYou} />}
 
       {/* ─── Header bar ─── */}
       <div
