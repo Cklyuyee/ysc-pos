@@ -1119,6 +1119,64 @@ export default function POSScreen() {
     } catch { /* ignore */ }
   };
 
+  /**
+   * Reset EVERYTHING tied to the current bill and spin up a fresh cart.
+   * Called after the cashier acknowledges the order-success dialog (any of the
+   * 3 buttons: บันทึก / บันทึก+พิมพ์ / ปิดหน้าต่าง) — guarantees the next bill
+   * starts with no leftover state (customer, address, coupons, fulfillment
+   * choices, claimed promos, credit-approval flag, prep-slip snapshot, etc.).
+   */
+  const handleStartNewBill = async () => {
+    // Close any lingering dialogs from the just-finished bill.
+    setShowOrderSuccess(false);
+    setShowPrepSlip(false);
+    setShowPayment(false);
+    setShowFulfillmentSummary(false);
+    setShowFulfillmentSummaryFull(false);
+    setShowBillIntercept(false);
+    setShowSlipUpload(false);
+
+    // Clear bill-scoped state.
+    setCustomer(null);
+    setSelectedAddressId(null);
+    setSelectedCourier('Flash Express');
+    setSessionAddresses([]);
+    setSessionDefaultAddressId(null);
+    setAppliedCoupons([]);
+    setPackaging([]);
+    setFulfillmentMap({});
+    setClaimedBuyGetSkus(new Set());
+    setClaimedOrderGiftIds(new Set());
+    setClaimedBrandPromoNames(new Set());
+    setClaimedRewardIds(new Set());
+    setCreditApprovalSubmitted(false);
+    setBarcodeInput('');
+    setPendingQty(1);
+    setPendingSlipOrderId(null);
+    setPendingSlipAmount(0);
+    setPrepSlipSnapshot(null);
+    setPrepSlipAutoDownload(false);
+    setBillSeq(n => n + 1);
+
+    // Spin up a fresh cart on the server. After checkout the previous cart is
+    // already in 'checked_out' state, so abandonCart may 4xx — swallow that.
+    try {
+      if (cartId) {
+        try { await abandonCart(cartId); } catch { /* already checked out — ignore */ }
+      }
+      const fresh = await createCart();
+      applyCartResponse(fresh);
+    } catch {
+      // Network blip — clear local cart so the cashier sees an empty slate
+      // and the next scan triggers ensureCartId() which creates a fresh one.
+      setCartId(null);
+      setCartItems([]);
+    }
+
+    // Ready to scan the next bill.
+    barcodeRef.current?.focus();
+  };
+
   // F5 holdBill: snapshots cart locally + abandons server cart so reserves go back to other registers.
   // Restore later re-adds items to a fresh cart (re-reserving against current stock).
   const holdBill = async (): Promise<void> => {
@@ -2120,17 +2178,16 @@ export default function POSScreen() {
                 </button>
               </div>
 
-              {/* Footer 3 actions
-                  - บันทึก       → silently download prep slip as PDF (no print dialog)
-                  - บันทึก+พิมพ์ → open prep slip + invoke browser print (physical printer)
-                  - ปิดหน้าต่าง  → close + ready for the next bill (cart was already reset on checkout) */}
+              {/* Footer 3 actions — ALL of them start a fresh new bill afterwards.
+                  - บันทึก       → silent PDF download, then new bill (via onDownloaded)
+                  - บันทึก+พิมพ์ → mount slip + print, then new bill (via afterprint event)
+                  - ปิดหน้าต่าง  → just start new bill */}
               <div className="px-6 py-4 border-t border-gray-200 grid grid-cols-3 gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
-                    // Silent PDF save — mounts the slip dialog with autoDownload=true.
-                    // The dialog captures itself via html2canvas → jsPDF → triggers a
-                    // browser download, then fires onDownloaded to dismiss everything.
+                    // Silent PDF save. handleStartNewBill is called from onDownloaded
+                    // once the file is written (see PreparationSlipDialog wiring below).
                     setShowOrderSuccess(false);
                     setPrepSlipAutoDownload(true);
                     setShowPrepSlip(true);
@@ -2145,8 +2202,17 @@ export default function POSScreen() {
                   onClick={() => {
                     setShowOrderSuccess(false);
                     setShowPrepSlip(true);
+                    const docId = prepSlipSnapshot?.docNumber ?? orderNumber;
+                    // Reset only after the browser's print dialog closes (whether the
+                    // user printed or cancelled — both fire 'afterprint').
+                    const onAfterPrint = () => {
+                      window.removeEventListener('afterprint', onAfterPrint);
+                      showSuccess(`บันทึกและสั่งพิมพ์ใบเตรียมสินค้า ${docId} แล้ว`);
+                      void handleStartNewBill();
+                    };
+                    window.addEventListener('afterprint', onAfterPrint);
+                    // Wait for the slip dialog to mount + paint before invoking print.
                     setTimeout(() => window.print(), 250);
-                    showSuccess(`บันทึกและสั่งพิมพ์ใบเตรียมสินค้า ${prepSlipSnapshot?.docNumber ?? orderNumber} แล้ว`);
                   }}
                   className="h-12 rounded-[12px] border border-gray-300 bg-white text-s2 text-text-primary hover:bg-bg-page-2 transition flex items-center justify-center gap-2"
                 >
@@ -2155,12 +2221,7 @@ export default function POSScreen() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    // Cart was already reset by handlePaymentConfirm/handleSlipUploaded.
-                    // Closing the dialog leaves cashier on an empty cart ready for the next bill.
-                    setShowOrderSuccess(false);
-                    barcodeRef.current?.focus();
-                  }}
+                  onClick={() => { void handleStartNewBill(); }}
                   className="h-12 rounded-[12px] border border-rose-200 bg-white text-s2 text-rose-500 hover:bg-rose-50 transition flex items-center justify-center gap-2"
                 >
                   <XCircle className="w-4 h-4" />
@@ -2217,9 +2278,11 @@ export default function POSScreen() {
           netTotal={prepSlipSnapshot.netTotal}
           autoDownloadPdf={prepSlipAutoDownload}
           onDownloaded={() => {
-            setPrepSlipAutoDownload(false);
-            setShowPrepSlip(false);
+            // Auto-download is the only path that fires onDownloaded — it's
+            // wired from the OrderSuccess "บันทึก" button which expects a
+            // fresh new bill once the PDF is on disk.
             showSuccess(`บันทึกใบเตรียมสินค้า ${prepSlipSnapshot.docNumber}.pdf เรียบร้อยแล้ว`);
+            void handleStartNewBill();
           }}
         />
       )}
